@@ -1,0 +1,2409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<title>Emerald Interrogator — BOP Intelligence Platform</title>
+<!-- FRAME BUSTER: If loaded inside SharePoint iframe, break out to full window -->
+<script>
+(function() {
+  try {
+    if (window.self !== window.top) {
+      window.top.location.href = window.self.location.href;
+    }
+  } catch(e) {
+    // Cross-origin frame — force navigation
+    document.addEventListener('DOMContentLoaded', function() {
+      document.body.innerHTML = '<div style="font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0a0f0d;color:#e8f5ee;text-align:center;gap:20px;padding:40px">' +
+        '<svg width="60" height="60" viewBox="0 0 42 42" fill="none"><polygon points="21,4 38,14 38,28 21,38 4,28 4,14" fill="none" stroke="#10b981" stroke-width="1.5"/><polygon points="21,4 33,14 21,24 9,14" fill="#10b981" opacity="0.7"/><polygon points="21,24 33,14 38,28 21,38" fill="#059669" opacity="0.9"/><polygon points="21,24 9,14 4,28 21,38" fill="#047857" opacity="0.9"/></svg>' +
+        '<h2 style="font-size:24px;margin:0">Open Emerald Interrogator</h2>' +
+        '<p style="color:#8fbbaa;max-width:400px;margin:0">Click the button below to open the Interrogator in full screen.</p>' +
+        '<a href="' + window.location.href + '" target="_blank" style="background:#10b981;color:#064e3b;font-weight:700;font-size:16px;padding:14px 32px;border-radius:10px;text-decoration:none;margin-top:8px">Open Emerald Interrogator →</a>' +
+        '</div>';
+    });
+  }
+})();
+</script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --emerald-900: #064e3b;
+    --emerald-800: #065f46;
+    --emerald-700: #047857;
+    --emerald-600: #059669;
+    --emerald-500: #10b981;
+    --emerald-400: #34d399;
+    --emerald-300: #6ee7b7;
+    --emerald-100: #d1fae5;
+    --emerald-50:  #ecfdf5;
+
+    --bg-base:    #0a0f0d;
+    --bg-surface: #111a16;
+    --bg-card:    #16221b;
+    --bg-elevated:#1d2e25;
+    --bg-input:   #1a2820;
+
+    --border:     #1f3329;
+    --border-mid: #2a4a37;
+    --border-bright: #3d6e52;
+
+    --text-primary:   #e8f5ee;
+    --text-secondary: #8fbbaa;
+    --text-muted:     #4d7a65;
+    --text-dim:       #2d5040;
+
+    --accent:     #10b981;
+    --accent-glow: rgba(16,185,129,0.15);
+    --accent-glow-strong: rgba(16,185,129,0.3);
+
+    --gold:    #d4a847;
+    --gold-dim: #7a5e20;
+
+    --danger: #ef4444;
+    --warn:   #f59e0b;
+
+    --font-display: 'DM Serif Display', Georgia, serif;
+    --font-body:    'DM Sans', sans-serif;
+    --font-mono:    'DM Mono', monospace;
+
+    --radius-sm: 6px;
+    --radius:    10px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+
+    --shadow-card: 0 4px 24px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
+    --shadow-glow: 0 0 24px rgba(16,185,129,0.12);
+    --shadow-glow-strong: 0 0 40px rgba(16,185,129,0.25);
+
+    --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+    --transition-slow: 0.4s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 10% 0%, rgba(16,185,129,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 90% 100%, rgba(6,78,59,0.08) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* === HEADER === */
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,15,13,0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .header-logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-decoration: none;
+  }
+
+  .logo-gem {
+    width: 42px;
+    height: 42px;
+    position: relative;
+  }
+
+  .logo-gem svg { width: 100%; height: 100%; }
+
+  .logo-text { line-height: 1.1; }
+
+  .logo-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .header-nav { display: flex; align-items: center; gap: 12px; }
+
+  .btn-dashboard {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-mid);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 9px 20px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: var(--transition);
+    letter-spacing: 0.01em;
+  }
+
+  .btn-dashboard:hover {
+    background: var(--bg-card);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: var(--shadow-glow);
+  }
+
+  /* === VIEWS === */
+  .view { display: none; position: relative; z-index: 1; }
+  .view.active { display: block; }
+
+  /* === DASHBOARD === */
+  .dashboard-hero {
+    padding: 72px 48px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .dashboard-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent-glow);
+    border: 1px solid rgba(16,185,129,0.25);
+    border-radius: 100px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--emerald-400);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .dashboard-eyebrow::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.85); }
+  }
+
+  .dashboard-title {
+    font-family: var(--font-display);
+    font-size: clamp(38px, 5vw, 58px);
+    font-weight: 400;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+  }
+
+  .dashboard-title em {
+    font-style: italic;
+    color: var(--emerald-400);
+  }
+
+  .dashboard-desc {
+    font-size: 17px;
+    color: var(--text-secondary);
+    max-width: 560px;
+    line-height: 1.65;
+    margin-bottom: 40px;
+  }
+
+  .btn-create {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--accent);
+    color: var(--emerald-900);
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 700;
+    padding: 14px 28px;
+    border-radius: var(--radius);
+    border: none;
+    cursor: pointer;
+    transition: var(--transition);
+    letter-spacing: 0.01em;
+    box-shadow: 0 4px 20px rgba(16,185,129,0.35);
+  }
+
+  .btn-create:hover {
+    background: var(--emerald-400);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 28px rgba(16,185,129,0.45);
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 48px 40px;
+    display: flex;
+    gap: 24px;
+  }
+
+  .stat-chip {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 24px;
+    flex: 1;
+  }
+
+  .stat-value {
+    font-family: var(--font-display);
+    font-size: 28px;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* Projects grid */
+  .projects-section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 48px 80px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+  }
+
+  .project-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .project-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    opacity: 0;
+    transition: var(--transition);
+  }
+
+  .project-card:hover {
+    border-color: var(--border-bright);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card), var(--shadow-glow);
+  }
+
+  .project-card:hover::before { opacity: 1; }
+
+  .project-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .project-name {
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+
+  .project-date {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .project-progress-badge {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--accent);
+    line-height: 1;
+    text-align: right;
+  }
+
+  .project-progress-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: right;
+    margin-top: 2px;
+  }
+
+  .module-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-bottom: 20px;
+  }
+
+  .module-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .module-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    flex-shrink: 0;
+  }
+
+  .module-item.done .module-dot { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+  .module-item.done { color: var(--text-secondary); }
+
+  .project-progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+
+  .project-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--emerald-700), var(--accent));
+    border-radius: 100px;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 80px 40px;
+    color: var(--text-muted);
+    grid-column: 1/-1;
+  }
+
+  .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+  .empty-text { font-size: 16px; }
+
+  /* === MODAL === */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-mid);
+    border-radius: var(--radius-xl);
+    padding: 40px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: var(--shadow-card);
+    animation: modalIn 0.25s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.96) translateY(8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .modal-title {
+    font-family: var(--font-display);
+    font-size: 26px;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+
+  .modal-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+
+  .form-group { margin-bottom: 20px; }
+
+  .form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+
+  .form-input, .form-select {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-mid);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 15px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    outline: none;
+    transition: var(--transition);
+    appearance: none;
+  }
+
+  .form-input:focus, .form-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .form-input::placeholder { color: var(--text-dim); }
+
+  .modal-actions { display: flex; gap: 12px; }
+
+  .btn-primary {
+    flex: 1;
+    background: var(--accent);
+    color: var(--emerald-900);
+    border: none;
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 700;
+    padding: 13px 24px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: 0 4px 16px rgba(16,185,129,0.3);
+  }
+
+  .btn-primary:hover { background: var(--emerald-400); transform: translateY(-1px); }
+
+  .btn-secondary {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-mid);
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 500;
+    padding: 13px 24px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .btn-secondary:hover { border-color: var(--border-bright); color: var(--text-primary); }
+
+  /* === MODULE VIEW === */
+  .module-view-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 48px 100px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    margin-bottom: 32px;
+    border: none;
+    background: none;
+    padding: 0;
+  }
+
+  .back-link:hover { color: var(--accent); }
+
+  /* Module nav tabs */
+  .module-nav {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    margin-bottom: 36px;
+    scrollbar-width: none;
+  }
+
+  .module-nav::-webkit-scrollbar { display: none; }
+
+  .module-tab {
+    flex-shrink: 0;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    border: 1px solid transparent;
+    background: none;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  .module-tab:hover { color: var(--text-secondary); background: var(--bg-elevated); }
+
+  .module-tab.active {
+    background: var(--accent);
+    color: var(--emerald-900);
+    font-weight: 700;
+  }
+
+  .module-tab.completed { color: var(--emerald-500); border-color: rgba(16,185,129,0.2); }
+
+  .module-tab-label { font-size: 10px; opacity: 0.7; display: block; margin-top: 2px; }
+
+  /* Module header */
+  .module-availability-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 100px;
+    margin-bottom: 16px;
+  }
+
+  .badge-april {
+    background: rgba(16,185,129,0.15);
+    color: var(--emerald-400);
+    border: 1px solid rgba(16,185,129,0.3);
+  }
+
+  .badge-june {
+    background: rgba(212,168,71,0.12);
+    color: var(--gold);
+    border: 1px solid rgba(212,168,71,0.25);
+  }
+
+  .badge-complete {
+    background: rgba(16,185,129,0.2);
+    color: var(--emerald-300);
+    border: 1px solid rgba(16,185,129,0.4);
+  }
+
+  .module-title {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 400;
+    letter-spacing: -0.03em;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    line-height: 1.1;
+  }
+
+  .module-desc {
+    font-size: 16px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    max-width: 680px;
+    margin-bottom: 36px;
+  }
+
+  /* Step cards */
+  .step-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    margin-bottom: 20px;
+    transition: var(--transition);
+  }
+
+  .step-card:focus-within {
+    border-color: var(--border-bright);
+    box-shadow: var(--shadow-glow);
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .step-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent-glow);
+    border: 1px solid rgba(16,185,129,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .step-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+  }
+
+  .step-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  /* Questions */
+  .question-group { margin-bottom: 20px; }
+
+  .question-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 9px;
+    letter-spacing: 0.01em;
+  }
+
+  .q-input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-mid);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 15px;
+    padding: 11px 15px;
+    border-radius: var(--radius);
+    outline: none;
+    transition: var(--transition);
+    resize: vertical;
+    min-height: 42px;
+  }
+
+  .q-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .q-input::placeholder { color: var(--text-dim); }
+
+  .q-textarea {
+    min-height: 100px;
+    line-height: 1.6;
+  }
+
+  /* URL inputs */
+  .url-inputs { display: flex; flex-direction: column; gap: 10px; }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 2px dashed var(--border-mid);
+    border-radius: var(--radius-lg);
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+  }
+
+  .drop-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .drop-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.6; }
+
+  .drop-text {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+  }
+
+  .drop-sub { font-size: 13px; color: var(--text-muted); }
+
+  .file-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .file-name { color: var(--text-secondary); font-weight: 500; }
+  .file-size { color: var(--text-muted); font-family: var(--font-mono); font-size: 12px; }
+
+  /* Analyze button row */
+  .analyze-row {
+    display: flex;
+    gap: 14px;
+    margin-top: 28px;
+  }
+
+  .btn-analyze {
+    flex: 1;
+    background: var(--accent);
+    color: var(--emerald-900);
+    border: none;
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 700;
+    padding: 16px 28px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 20px rgba(16,185,129,0.35);
+  }
+
+  .btn-analyze:hover { background: var(--emerald-400); transform: translateY(-1px); box-shadow: 0 6px 28px rgba(16,185,129,0.45); }
+  .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-sample {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-mid);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 16px 24px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .btn-sample:hover { border-color: var(--border-bright); color: var(--text-primary); }
+
+  /* Output card */
+  .output-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-bright);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    margin-top: 24px;
+    display: none;
+    animation: fadeIn 0.4s ease;
+  }
+
+  .output-card.visible { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .output-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .output-actions { display: flex; gap: 8px; }
+
+  .btn-copy, .btn-mark-complete {
+    background: none;
+    border: 1px solid var(--border-mid);
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .btn-copy:hover { border-color: var(--border-bright); color: var(--text-secondary); }
+
+  .btn-mark-complete {
+    background: var(--accent-glow);
+    border-color: rgba(16,185,129,0.3);
+    color: var(--accent);
+  }
+
+  .btn-mark-complete:hover { background: rgba(16,185,129,0.25); }
+
+  .output-content {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.75;
+    white-space: pre-wrap;
+  }
+
+  .output-content h2 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--text-primary);
+    margin: 20px 0 8px;
+    letter-spacing: -0.02em;
+  }
+
+  .output-content h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--emerald-400);
+    margin: 16px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 12px;
+  }
+
+  .output-content strong { color: var(--text-primary); font-weight: 600; }
+
+  /* Loading state */
+  .loading-state {
+    display: none;
+    text-align: center;
+    padding: 48px 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-top: 20px;
+  }
+
+  .loading-state.visible { display: block; }
+
+  .loading-gem {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 20px;
+    animation: spin 3s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .loading-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+
+  .loading-sub { font-size: 13px; color: var(--text-muted); }
+
+  /* Locked module */
+  .locked-overlay {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 60px 40px;
+    text-align: center;
+  }
+
+  .locked-icon { font-size: 40px; margin-bottom: 16px; opacity: 0.5; }
+  .locked-title { font-family: var(--font-display); font-size: 24px; margin-bottom: 10px; color: var(--text-primary); }
+  .locked-desc { font-size: 15px; color: var(--text-muted); max-width: 400px; margin: 0 auto; line-height: 1.65; }
+
+  /* Project header in module view */
+  .project-header-bar {
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .project-header-name {
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+  }
+
+  .project-header-meta {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .project-completion {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .completion-text {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .completion-bar {
+    width: 120px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+
+  .completion-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--emerald-700), var(--accent));
+    border-radius: 100px;
+    transition: width 0.6s ease;
+  }
+
+  /* Intel context panel */
+  .intel-context-panel {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    margin-bottom: 28px;
+    border: 1px solid;
+  }
+
+  .intel-panel-empty {
+    background: var(--bg-card);
+    border-color: var(--border);
+  }
+
+  .intel-panel-active {
+    background: linear-gradient(135deg, rgba(16,185,129,0.07) 0%, rgba(6,78,59,0.12) 100%);
+    border-color: rgba(16,185,129,0.25);
+    box-shadow: 0 0 20px rgba(16,185,129,0.06);
+  }
+
+  .intel-context-icon {
+    font-size: 22px;
+    color: var(--accent);
+    flex-shrink: 0;
+    margin-top: 2px;
+    opacity: 0.8;
+  }
+
+  .intel-panel-empty .intel-context-icon { color: var(--text-dim); }
+
+  .intel-context-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+    letter-spacing: -0.01em;
+  }
+
+  .intel-panel-empty .intel-context-title { color: var(--text-muted); }
+
+  .intel-context-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.55;
+    margin-bottom: 14px;
+  }
+
+  .intel-panel-empty .intel-context-desc { margin-bottom: 0; }
+
+  .intel-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .intel-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(16,185,129,0.1);
+    border: 1px solid rgba(16,185,129,0.25);
+    border-radius: 100px;
+    padding: 4px 12px 4px 8px;
+  }
+
+  .intel-chip-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--accent);
+    background: rgba(16,185,129,0.2);
+    border-radius: 100px;
+    padding: 1px 6px;
+  }
+
+  .intel-chip-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--emerald-300);
+  }
+
+  /* === API KEY MODAL === */
+  .apikey-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    backdrop-filter: blur(8px);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+  }
+  .apikey-overlay.active { display: flex; }
+
+  .apikey-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: var(--radius-xl);
+    padding: 48px 44px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: var(--shadow-card), var(--shadow-glow-strong);
+    animation: modalIn 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .apikey-gem {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 24px;
+  }
+
+  .apikey-title {
+    font-family: var(--font-display);
+    font-size: 28px;
+    letter-spacing: -0.03em;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+  }
+
+  .apikey-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    margin-bottom: 28px;
+  }
+
+  .apikey-input-wrap {
+    position: relative;
+    margin-bottom: 12px;
+  }
+
+  .apikey-input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-mid);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    padding: 13px 48px 13px 16px;
+    border-radius: var(--radius);
+    outline: none;
+    transition: var(--transition);
+    letter-spacing: 0.04em;
+  }
+
+  .apikey-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .apikey-input::placeholder { color: var(--text-dim); letter-spacing: 0; font-family: var(--font-body); }
+
+  .apikey-toggle {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    transition: var(--transition);
+  }
+
+  .apikey-toggle:hover { color: var(--accent); }
+
+  .apikey-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    line-height: 1.55;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .apikey-note-icon { flex-shrink: 0; margin-top: 1px; color: var(--accent); }
+
+  .apikey-error {
+    display: none;
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #fca5a5;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+  }
+
+  .apikey-error.visible { display: block; }
+
+  .btn-apikey-submit {
+    width: 100%;
+    background: var(--accent);
+    color: var(--emerald-900);
+    border: none;
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 700;
+    padding: 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: 0 4px 20px rgba(16,185,129,0.35);
+  }
+
+  .btn-apikey-submit:hover { background: var(--emerald-400); }
+
+  /* API key status in header */
+  .api-status {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 7px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    transition: var(--transition);
+    letter-spacing: 0.02em;
+  }
+
+  .api-status:hover { border-color: var(--border-bright); color: var(--text-secondary); }
+
+  .api-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--danger);
+    flex-shrink: 0;
+  }
+
+  .api-status.connected .api-status-dot {
+    background: var(--accent);
+    box-shadow: 0 0 5px var(--accent);
+    animation: pulse 2.5s ease-in-out infinite;
+  }
+
+  .api-status.connected { color: var(--accent); border-color: rgba(16,185,129,0.25); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 100px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .dashboard-hero { padding: 48px 24px 32px; }
+    .stats-bar { padding: 0 24px 32px; flex-wrap: wrap; }
+    .projects-section { padding: 0 24px 60px; }
+    .module-view-inner { padding: 24px 24px 80px; }
+    .project-header-bar { padding: 14px 24px; }
+    .header { padding: 0 20px; }
+    .analyze-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <a class="header-logo" href="#" onclick="showDashboard(); return false;">
+    <div class="logo-gem">
+      <svg viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="21,4 38,14 38,28 21,38 4,28 4,14" fill="none" stroke="#10b981" stroke-width="1.5"/>
+        <polygon points="21,4 33,14 21,24 9,14" fill="#10b981" opacity="0.7"/>
+        <polygon points="21,24 33,14 38,28 21,38" fill="#059669" opacity="0.9"/>
+        <polygon points="21,24 9,14 4,28 21,38" fill="#047857" opacity="0.9"/>
+        <line x1="21" y1="4" x2="21" y2="38" stroke="#34d399" stroke-width="0.5" opacity="0.4"/>
+        <line x1="4" y1="14" x2="38" y2="14" stroke="#34d399" stroke-width="0.5" opacity="0.4"/>
+        <line x1="4" y1="28" x2="38" y2="28" stroke="#34d399" stroke-width="0.5" opacity="0.4"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <div class="logo-title">Emerald Interrogator</div>
+      <div class="logo-sub">BOP Intelligence Platform</div>
+    </div>
+  </a>
+  <nav class="header-nav">
+    <div class="api-status" id="api-status-btn" onclick="openApiKeyModal()" title="Click to update API key">
+      <div class="api-status-dot"></div>
+      <span id="api-status-text">API Key Required</span>
+    </div>
+    <button class="btn-dashboard" onclick="showDashboard()">Dashboard</button>
+  </nav>
+</header>
+
+<!-- API KEY MODAL -->
+<div class="apikey-overlay" id="modal-apikey">
+  <div class="apikey-modal">
+    <div class="apikey-gem">
+      <svg viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="21,4 38,14 38,28 21,38 4,28 4,14" fill="none" stroke="#10b981" stroke-width="1.5"/>
+        <polygon points="21,4 33,14 21,24 9,14" fill="#10b981" opacity="0.7"/>
+        <polygon points="21,24 33,14 38,28 21,38" fill="#059669" opacity="0.9"/>
+        <polygon points="21,24 9,14 4,28 21,38" fill="#047857" opacity="0.9"/>
+      </svg>
+    </div>
+    <h2 class="apikey-title">Connect to Claude AI</h2>
+    <p class="apikey-desc">Enter your Anthropic API key to activate the Emerald Interrogator. Your key is stored only in this browser session and is never saved to disk or transmitted anywhere other than the Anthropic API.</p>
+    <div class="apikey-input-wrap">
+      <input class="apikey-input" id="apikey-input" type="password" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false" />
+      <button class="apikey-toggle" onclick="toggleApiKeyVisibility()" id="apikey-toggle-btn" title="Show/hide key">👁</button>
+    </div>
+    <div class="apikey-note">
+      <span class="apikey-note-icon">🔒</span>
+      <span>Your key is held in memory for this session only. It is cleared when you close or refresh the browser. Each session requires re-entry. This keeps your Emerald API credentials secure.</span>
+    </div>
+    <div class="apikey-error" id="apikey-error">Invalid API key format. Anthropic keys begin with <strong>sk-ant-</strong>. Please check and try again.</div>
+    <button class="btn-apikey-submit" onclick="submitApiKey()">Activate Interrogator</button>
+  </div>
+</div>
+
+<!-- DASHBOARD VIEW -->
+<div id="view-dashboard" class="view active">
+  <div class="dashboard-hero">
+    <div class="dashboard-eyebrow">BOP 2026–2027 Season</div>
+    <h1 class="dashboard-title">Your Show<br><em>Intelligence</em> Hub</h1>
+    <p class="dashboard-desc">AI-powered strategic planning for every event in the Emerald portfolio. Build your Business Operational Plan with structured intelligence — module by module.</p>
+    <button class="btn-create" onclick="openCreateModal()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Create New Show Plan
+    </button>
+  </div>
+
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat-chip">
+      <div class="stat-value" id="stat-shows">0</div>
+      <div class="stat-label">Active Shows</div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-value" id="stat-modules">0</div>
+      <div class="stat-label">Modules Complete</div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-value" id="stat-pct">0%</div>
+      <div class="stat-label">Avg. Completion</div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-value">13</div>
+      <div class="stat-label">BOP Modules</div>
+    </div>
+  </div>
+
+  <div class="projects-section">
+    <div class="section-header">
+      <h2 class="section-title">Show Plans</h2>
+    </div>
+    <div class="projects-grid" id="projects-grid">
+      <div class="empty-state">
+        <div class="empty-icon">◇</div>
+        <div class="empty-text">No show plans yet. Create your first to get started.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODULE VIEW -->
+<div id="view-module" class="view">
+  <div class="project-header-bar">
+    <div>
+      <div class="project-header-name" id="project-display-name">Show Name</div>
+      <div class="project-header-meta" id="project-display-meta">BOP 2026–2027</div>
+    </div>
+    <div class="project-completion">
+      <span class="completion-text" id="project-completion-text">0/13</span>
+      <div class="completion-bar">
+        <div class="completion-fill" id="project-completion-fill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+  <div class="module-view-inner">
+    <button class="back-link" onclick="showDashboard()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Dashboard
+    </button>
+
+    <div class="module-nav" id="module-nav"></div>
+
+    <div id="module-content"></div>
+  </div>
+</div>
+
+<!-- CREATE MODAL -->
+<div class="modal-overlay" id="modal-create">
+  <div class="modal">
+    <h2 class="modal-title">New Show Plan</h2>
+    <p class="modal-desc">Create a BOP intelligence workspace for an Emerald show. Each plan runs all 13 interrogation modules mapped to your BOP document.</p>
+    <div class="form-group">
+      <label class="form-label">Show Name</label>
+      <input class="form-input" id="input-show-name" type="text" placeholder="e.g., NY NOW, Surf Expo, JA New York…" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Show Vertical / Industry</label>
+      <input class="form-input" id="input-show-vertical" type="text" placeholder="e.g., Gift & Home, Action Sports, Jewelry…" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Planning Season</label>
+      <select class="form-select" id="input-show-season">
+        <option value="2026-2027">2026–2027</option>
+        <option value="2025-2026">2025–2026</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeCreateModal()">Cancel</button>
+      <button class="btn-primary" onclick="createProject()">Create Show Plan</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// API KEY CONFIGURATION
+// ============================================================
+// Paste your Anthropic API key between the quotes below.
+// Save the file and re-upload to SharePoint. That's it.
+// ============================================================
+
+const ANTHROPIC_API_KEY = '';
+
+// ============================================================
+// API KEY MANAGEMENT
+// ============================================================
+
+let _apiKey = ANTHROPIC_API_KEY;
+
+function getApiKey() { return _apiKey; }
+
+function openApiKeyModal() {
+  // Try modal first, fall back to prompt() for SharePoint iframe compatibility
+  const modal = document.getElementById('modal-apikey');
+  if (modal) {
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+    document.getElementById('apikey-error').classList.remove('visible');
+    setTimeout(() => {
+      const input = document.getElementById('apikey-input');
+      if (input) input.focus();
+    }, 100);
+  } else {
+    // Fallback for iframe environments
+    const key = prompt('Enter your Anthropic API key (starts with sk-ant-):');
+    if (key && key.startsWith('sk-ant-')) {
+      _apiKey = key;
+      updateApiStatus(true);
+    }
+  }
+}
+
+function closeApiKeyModal() {
+  const modal = document.getElementById('modal-apikey');
+  if (modal) {
+    modal.style.display = 'none';
+    modal.classList.remove('active');
+  }
+}
+
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('apikey-input');
+  const btn = document.getElementById('apikey-toggle-btn');
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
+function submitApiKey() {
+  const input = document.getElementById('apikey-input');
+  const errEl = document.getElementById('apikey-error');
+  if (!input) return;
+  const val = input.value.trim();
+
+  if (!val.startsWith('sk-ant-')) {
+    if (errEl) errEl.classList.add('visible');
+    return;
+  }
+
+  _apiKey = val;
+  input.value = '';
+  if (errEl) errEl.classList.remove('visible');
+  closeApiKeyModal();
+  updateApiStatus(true);
+}
+
+function updateApiStatus(connected) {
+  const btn = document.getElementById('api-status-btn');
+  const text = document.getElementById('api-status-text');
+  if (!btn || !text) return;
+  if (connected) {
+    btn.classList.add('connected');
+    text.textContent = 'API Connected';
+  } else {
+    btn.classList.remove('connected');
+    text.textContent = 'API Key Required';
+  }
+}
+
+async function callClaude(prompt) {
+  const key = getApiKey();
+  if (!key) {
+    openApiKeyModal();
+    throw new Error('API key required. Please enter your Anthropic API key.');
+  }
+
+  // Use XMLHttpRequest instead of fetch — works from file:// in most browsers
+  // with the dangerously-allow-browser header for direct API access
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'https://api.anthropic.com/v1/messages', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('x-api-key', key);
+    xhr.setRequestHeader('anthropic-version', '2023-06-01');
+    xhr.setRequestHeader('anthropic-beta', 'dangerously-allow-browser');
+
+    xhr.onload = function() {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status === 200) {
+          resolve(data.content?.map(b => b.text || '').join('') || 'No output received.');
+        } else {
+          if (xhr.status === 401) {
+            _apiKey = '';
+            updateApiStatus(false);
+            openApiKeyModal();
+            reject(new Error('Invalid API key. Please re-enter your Anthropic API key.'));
+          } else {
+            reject(new Error(data?.error?.message || `HTTP ${xhr.status}`));
+          }
+        }
+      } catch(e) {
+        reject(new Error('Failed to parse API response.'));
+      }
+    };
+
+    xhr.onerror = function() {
+      // If XHR also blocked, give clear instructions
+      reject(new Error(
+        'Connection blocked by browser security.\n\n' +
+        'TO FIX: Open Chrome and paste this into the address bar:\n' +
+        'chrome://flags/#block-insecure-private-network-requests\n\n' +
+        'OR simply open the file in Firefox — Firefox allows this by default.\n\n' +
+        'OR right-click Chrome shortcut → Properties → add to Target field:\n' +
+        '--allow-file-access-from-files --disable-web-security --user-data-dir="%TEMP%\\chrome-dev"'
+      ));
+    };
+
+    xhr.send(JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2500,
+      messages: [{ role: 'user', content: prompt }]
+    }));
+  });
+}
+
+// ============================================================
+// DATA
+// ============================================================
+
+const MODULES = [
+  {
+    id: 1,
+    number: 1,
+    name: "Situational Assessment",
+    availability: "april",
+    desc: "Establish a current-state baseline for the event — market position, competitive standing, internal performance trends, and organizational context entering the planning cycle.",
+    questions: [
+      { id: "q1", label: "What is the current market position of this show in its vertical/industry?", placeholder: "Describe where the show stands relative to competitors and industry benchmarks", type: "textarea" },
+      { id: "q2", label: "What were the key attendance and exhibitor metrics from the most recent event?", placeholder: "Include attendance figures, exhibitor count, NSF, NPS scores if available", type: "textarea" },
+      { id: "q3", label: "What are the most significant internal performance trends (positive or negative) over the past 2 seasons?", placeholder: "Revenue trends, renewal rates, audience growth/decline, content performance, etc.", type: "textarea" },
+      { id: "q4", label: "What organizational or operational context is most relevant heading into this planning cycle?", placeholder: "Team changes, budget shifts, strategic priorities from leadership, new mandates", type: "textarea" },
+      { id: "q5", label: "What are the top 2–3 strategic questions leadership expects this BOP to answer?", placeholder: "e.g., How do we grow exhibitor revenue 15%? What's our attendee acquisition strategy?", type: "textarea" },
+    ]
+  },
+  {
+    id: 2,
+    number: 2,
+    name: "Market Drivers & Predictions",
+    availability: "april",
+    desc: "Identify and interpret macro and micro forces affecting the event's sector — including industry trends, regulatory shifts, economic conditions, and emerging buyer behavior — with forward-looking projections for the 24-month planning window.",
+    questions: [
+      { id: "q1", label: "What are the 3–5 most significant macro trends reshaping this industry over the next 24 months?", placeholder: "e.g., nearshoring, sustainability mandates, AI adoption, tariff impacts, demographic shifts", type: "textarea" },
+      { id: "q2", label: "What regulatory or policy changes (if any) are most likely to affect exhibitor or attendee behavior?", placeholder: "Trade policy, environmental regulations, labor laws, import/export shifts", type: "textarea" },
+      { id: "q3", label: "What economic conditions are most relevant to your exhibitors' investment decisions?", placeholder: "Interest rates, consumer spending, retail conditions, B2B buying cycles", type: "textarea" },
+      { id: "q4", label: "What emerging buyer or attendee behaviors are changing how your audience approaches trade shows?", placeholder: "Digital-first research, shorter buying windows, peer-driven decisions, format preferences", type: "textarea" },
+      { id: "q5", label: "What competitive events or formats are gaining momentum that could impact your show's relevance?", placeholder: "New shows launching, virtual formats growing, regional shows consolidating, private brand events", type: "textarea" },
+    ]
+  },
+  {
+    id: 3,
+    number: 3,
+    name: "Voice of Customer — Exhibitors & Attendees",
+    availability: "june",
+    desc: "Structure and analyze qualitative and quantitative feedback from both exhibitor and attendee audiences to surface unmet needs, satisfaction drivers, and loyalty signals.",
+    questions: [
+      { id: "q1", label: "What do your most loyal exhibitors say makes this show irreplaceable to their business?", placeholder: "Paste or summarize feedback from your top exhibitor accounts", type: "textarea" },
+      { id: "q2", label: "What are the most common objections or complaints from exhibitors who did not renew?", placeholder: "Non-renewal reasons, exit survey themes, sales team feedback", type: "textarea" },
+      { id: "q3", label: "What do attending buyers say is their primary reason for attending — and what are their top frustrations?", placeholder: "Attendee survey themes, NPS comments, focus group insights", type: "textarea" },
+      { id: "q4", label: "What unmet needs are your audiences expressing that the show currently does not address?", placeholder: "Programming gaps, product categories missing, networking formats, sourcing needs", type: "textarea" },
+      { id: "q5", label: "What would make your highest-value exhibitors increase their investment, and your most loyal attendees bring more colleagues?", placeholder: "Loyalty drivers, upsell triggers, co-location motivators", type: "textarea" },
+    ]
+  },
+  {
+    id: 4,
+    number: 4,
+    name: "Event Value Proposition",
+    availability: "april",
+    desc: "Interrogate and sharpen the event's core value promise — what it uniquely delivers to exhibitors, attendees, and the broader industry — and test that proposition against current market and competitive realities.",
+    questions: [
+      { id: "q1", label: "In one or two sentences, what is the show's current stated value proposition to exhibitors?", placeholder: "What does the show promise exhibitors they cannot get elsewhere?", type: "textarea" },
+      { id: "q2", label: "In one or two sentences, what is the show's current stated value proposition to attendees?", placeholder: "What does the show promise attending buyers they cannot get elsewhere?", type: "textarea" },
+      { id: "q3", label: "To what extent does the current value proposition hold up against today's competitive alternatives?", placeholder: "Be honest — where is it still compelling, and where has the market moved past it?", type: "textarea" },
+      { id: "q4", label: "What proof points (data, testimonials, outcomes) best validate the show's value today?", placeholder: "ROI data, buyer-seller connection metrics, deal flow, brand exposure results", type: "textarea" },
+      { id: "q5", label: "If you were to sharpen or evolve the value proposition for 2026–2027, what would you change and why?", placeholder: "What new promises can you credibly make? What promises no longer resonate?", type: "textarea" },
+    ]
+  },
+  {
+    id: 5,
+    number: 5,
+    name: "Top 3 Strengths",
+    availability: "june",
+    desc: "Identify and evidence the event's three most defensible and differentiating strengths entering the season and define how those strengths should be amplified in strategy and messaging.",
+    questions: [
+      { id: "q1", label: "What is Strength #1 — and what evidence best supports it?", placeholder: "Name the strength and describe the data or proof that makes it credible and defensible", type: "textarea" },
+      { id: "q2", label: "What is Strength #2 — and what evidence best supports it?", placeholder: "Name the strength and describe the data or proof that makes it credible and defensible", type: "textarea" },
+      { id: "q3", label: "What is Strength #3 — and what evidence best supports it?", placeholder: "Name the strength and describe the data or proof that makes it credible and defensible", type: "textarea" },
+      { id: "q4", label: "Which of these three strengths is most underutilized in current marketing and sales efforts?", placeholder: "Where is the gap between your actual strength and how loudly you're claiming it?", type: "textarea" },
+    ]
+  },
+  {
+    id: 6,
+    number: 6,
+    name: "Top 3 Challenges",
+    availability: "june",
+    desc: "Surface and contextualize the three most significant challenges facing the event — whether operational, competitive, structural, or market-driven — and assess their materiality to BOP outcomes.",
+    questions: [
+      { id: "q1", label: "What is Challenge #1 — and how significant is its impact on BOP outcomes if left unaddressed?", placeholder: "Describe the challenge and assess its consequence (revenue, attendance, competitive position)", type: "textarea" },
+      { id: "q2", label: "What is Challenge #2 — and how significant is its impact on BOP outcomes if left unaddressed?", placeholder: "Describe the challenge and assess its consequence", type: "textarea" },
+      { id: "q3", label: "What is Challenge #3 — and how significant is its impact on BOP outcomes if left unaddressed?", placeholder: "Describe the challenge and assess its consequence", type: "textarea" },
+      { id: "q4", label: "For each challenge, is the root cause internal (within the show team's control) or external (market/industry forces)?", placeholder: "This distinction determines whether the BOP response is operational or adaptive", type: "textarea" },
+    ]
+  },
+  {
+    id: 7,
+    number: 7,
+    name: "Top 3 Growth Opportunities",
+    availability: "june",
+    desc: "Identify the three highest-conviction opportunities available to the event in the planning horizon — including white space in the market, audience expansion, content adjacencies, and format innovation.",
+    questions: [
+      { id: "q1", label: "What is Opportunity #1 — and why is now the right time to act on it?", placeholder: "Describe the opportunity and the timing logic — what market condition makes this actionable now?", type: "textarea" },
+      { id: "q2", label: "What is Opportunity #2 — and why is now the right time to act on it?", placeholder: "Describe the opportunity and timing logic", type: "textarea" },
+      { id: "q3", label: "What is Opportunity #3 — and why is now the right time to act on it?", placeholder: "Describe the opportunity and timing logic", type: "textarea" },
+      { id: "q4", label: "Which opportunity has the highest potential ROI for the 2026–2027 season, and what would it take to capture it?", placeholder: "Investment required, lead time, team capacity, dependencies", type: "textarea" },
+    ]
+  },
+  {
+    id: 8,
+    number: 8,
+    name: "24-Month Event Strategy",
+    availability: "june",
+    desc: "Develop a structured strategic plan for the event across the full 2026–2027 season, covering positioning, audience development, exhibitor growth, and competitive response — aligned to BOP commitments.",
+    questions: [
+      { id: "q1", label: "What is the show's primary strategic objective for the 2026–2027 season (in one sentence)?", placeholder: "e.g., Regain category leadership in the gift market, grow net square footage by 12%, launch a new buyer audience segment", type: "input" },
+      { id: "q2", label: "What is the exhibitor growth strategy for the season?", placeholder: "New category expansion, geographic reach, vertical deepening, competitive conquest targets", type: "textarea" },
+      { id: "q3", label: "What is the attendee/buyer development strategy for the season?", placeholder: "New buyer segments, geographic markets, digital pre-show activation, loyalty programs", type: "textarea" },
+      { id: "q4", label: "How will the show respond to its top competitive threats over this period?", placeholder: "Defensive moves, differentiation investments, timing and sequencing decisions", type: "textarea" },
+      { id: "q5", label: "What are the 3 most critical milestones the show must hit in the next 12 months to stay on strategy?", placeholder: "Specific, time-bound milestones that indicate strategic execution is on track", type: "textarea" },
+    ]
+  },
+  {
+    id: 9,
+    number: 9,
+    name: "Content Alignment",
+    availability: "june",
+    desc: "Assess and design the event's content programming strategy — ensuring topics, formats, speakers, and experiences are aligned to audience priorities, market conditions, and revenue objectives.",
+    questions: [
+      { id: "q1", label: "What are the top 3–5 content themes most relevant to your audience in 2026–2027?", placeholder: "Based on market drivers, audience feedback, and industry momentum — not just what you've always done", type: "textarea" },
+      { id: "q2", label: "What content formats are your audiences engaging with most, and which are underperforming?", placeholder: "Keynotes, workshops, demo stages, matchmaking, networking, digital content — what works and what doesn't?", type: "textarea" },
+      { id: "q3", label: "How does your content programming currently support exhibitor and attendee revenue objectives?", placeholder: "Does content drive booth traffic? Does it attract the right buyers? Does it justify attendance cost?", type: "textarea" },
+      { id: "q4", label: "What content innovation or investment would most meaningfully differentiate the show in its market?", placeholder: "New format, new speaker tier, new programming model, new technology integration", type: "textarea" },
+    ]
+  },
+  {
+    id: 10,
+    number: 10,
+    name: "Investment & Resource Requirements",
+    availability: "june",
+    desc: "Map the people, technology, partnerships, and capital investments required to execute the event strategy, with explicit linkage to expected outcomes and ROI logic.",
+    questions: [
+      { id: "q1", label: "What are the top people/team investments required to execute the 2026–2027 strategy?", placeholder: "Headcount gaps, capability needs, external partners or agencies required", type: "textarea" },
+      { id: "q2", label: "What technology or platform investments are required or planned?", placeholder: "Event tech, marketing automation, data/analytics, mobile app, virtual components", type: "textarea" },
+      { id: "q3", label: "What partnerships or sponsorships are critical to the strategy — and what is their funding requirement?", placeholder: "Media partners, association relationships, anchor sponsors, co-locators", type: "textarea" },
+      { id: "q4", label: "For each major investment area, what is the expected return or outcome that justifies the investment?", placeholder: "Link investments to specific BOP metrics: revenue, attendance, NPS, net square footage", type: "textarea" },
+    ]
+  },
+  {
+    id: 11,
+    number: 11,
+    name: "Budget Prioritization",
+    availability: "june",
+    desc: "Structure a prioritization framework for budget allocation across event activities — distinguishing must-fund, high-return, and discretionary investments in the context of available resources.",
+    questions: [
+      { id: "q1", label: "What are the non-negotiable budget commitments that must be funded regardless of overall budget level?", placeholder: "Venue, core production, legally committed contracts, essential headcount", type: "textarea" },
+      { id: "q2", label: "What investments have the highest expected return on revenue or audience growth?", placeholder: "Where does the data or prior season performance suggest the best ROI for incremental spend?", type: "textarea" },
+      { id: "q3", label: "What discretionary investments are you considering, and what is the go/no-go logic for each?", placeholder: "New initiatives, expanded programming, incremental marketing spend, pilot programs", type: "textarea" },
+      { id: "q4", label: "If the budget were reduced by 15–20%, what would you cut first and what would you protect?", placeholder: "This forces honest prioritization and reveals what the team truly believes drives outcomes", type: "textarea" },
+    ]
+  },
+  {
+    id: 12,
+    number: 12,
+    name: "Risks & Opportunities",
+    availability: "june",
+    desc: "Build a structured risk register and opportunity map for the event, with probability and impact assessment and defined mitigation or activation pathways for each item.",
+    questions: [
+      { id: "q1", label: "What are the top 3–5 risks to achieving your 2026–2027 BOP targets?", placeholder: "For each: describe the risk, estimate probability (H/M/L) and impact (H/M/L), and name a mitigation action", type: "textarea" },
+      { id: "q2", label: "What are the top 3 upside opportunities that could meaningfully exceed your BOP targets?", placeholder: "For each: describe the opportunity, its probability of capture, and what it would take to activate it", type: "textarea" },
+      { id: "q3", label: "Which single risk poses the greatest threat to the season — and what is your contingency plan?", placeholder: "Your highest-priority risk mitigation focus for the BOP period", type: "textarea" },
+      { id: "q4", label: "Are there any known external events (macro, competitive, industry) that could materially change your risk or opportunity profile mid-season?", placeholder: "Economic shifts, competitor moves, regulatory changes, major industry disruptions", type: "textarea" },
+    ]
+  },
+  {
+    id: 13,
+    number: 13,
+    name: "Operational & Financial Metrics",
+    availability: "june",
+    desc: "Define the KPI architecture for measuring event performance — across operational execution, financial results, and audience engagement — and establish baselines and targets for the planning period.",
+    questions: [
+      { id: "q1", label: "What are the 3–5 financial KPIs that define success for this show in 2026–2027?", placeholder: "Revenue, NSF, exhibitor revenue per sq ft, average deal size, renewal rate — with prior year baselines", type: "textarea" },
+      { id: "q2", label: "What are the 3–5 audience KPIs that define success for exhibitors and attendees?", placeholder: "Attendance, buyer quality score, exhibitor NPS, buyer-seller meeting rate, content session ratings", type: "textarea" },
+      { id: "q3", label: "What operational KPIs are most important to the show team's execution quality?", placeholder: "Sales pacing vs. plan, marketing MQL targets, lead time for key milestones, vendor performance metrics", type: "textarea" },
+      { id: "q4", label: "For each KPI, what is the prior year baseline and the 2026–2027 target?", placeholder: "Set targets that are ambitious but achievable — this becomes the BOP scorecard", type: "textarea" },
+    ]
+  }
+];
+
+// ============================================================
+// STATE
+// ============================================================
+
+let projects = JSON.parse(localStorage.getItem('emerald-projects') || '[]');
+let currentProjectId = null;
+let currentModuleId = 1;
+
+function saveProjects() {
+  localStorage.setItem('emerald-projects', JSON.stringify(projects));
+}
+
+function getProject(id) {
+  return projects.find(p => p.id === id);
+}
+
+function getCompletedCount(project) {
+  return Object.values(project.completed || {}).filter(Boolean).length;
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+
+function showDashboard() {
+  document.getElementById('view-dashboard').classList.add('active');
+  document.getElementById('view-module').classList.remove('active');
+  renderDashboard();
+}
+
+function renderDashboard() {
+  const grid = document.getElementById('projects-grid');
+  updateStats();
+
+  if (projects.length === 0) {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">◇</div><div class="empty-text">No show plans yet. Create your first to get started.</div></div>`;
+    return;
+  }
+
+  grid.innerHTML = projects.map(p => {
+    const done = getCompletedCount(p);
+    const pct = Math.round((done / 13) * 100);
+    const moduleItems = MODULES.slice(0, 6).map(m => {
+      const isDone = p.completed && p.completed[m.id];
+      return `<div class="module-item ${isDone ? 'done' : ''}"><div class="module-dot"></div>${m.name}</div>`;
+    }).join('');
+
+    return `
+      <div class="project-card" onclick="openProject('${p.id}')">
+        <div class="project-card-header">
+          <div>
+            <div class="project-name">${p.name}</div>
+            <div class="project-date">Created ${p.created} · ${p.season}</div>
+          </div>
+          <div>
+            <div class="project-progress-badge">${done}/${13}</div>
+            <div class="project-progress-label">Modules</div>
+          </div>
+        </div>
+        <div class="module-list">${moduleItems}</div>
+        <div class="project-progress-bar">
+          <div class="project-progress-fill" style="width:${pct}%"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateStats() {
+  document.getElementById('stat-shows').textContent = projects.length;
+  const totalDone = projects.reduce((sum, p) => sum + getCompletedCount(p), 0);
+  document.getElementById('stat-modules').textContent = totalDone;
+  const avgPct = projects.length > 0
+    ? Math.round(projects.reduce((sum, p) => sum + (getCompletedCount(p) / 13 * 100), 0) / projects.length)
+    : 0;
+  document.getElementById('stat-pct').textContent = avgPct + '%';
+}
+
+// ============================================================
+// CREATE PROJECT
+// ============================================================
+
+function openCreateModal() {
+  document.getElementById('modal-create').classList.add('active');
+  document.getElementById('input-show-name').focus();
+}
+
+function closeCreateModal() {
+  document.getElementById('modal-create').classList.remove('active');
+  document.getElementById('input-show-name').value = '';
+  document.getElementById('input-show-vertical').value = '';
+}
+
+function createProject() {
+  const name = document.getElementById('input-show-name').value.trim();
+  const vertical = document.getElementById('input-show-vertical').value.trim();
+  const season = document.getElementById('input-show-season').value;
+
+  if (!name) {
+    document.getElementById('input-show-name').focus();
+    return;
+  }
+
+  const project = {
+    id: Date.now().toString(),
+    name,
+    vertical: vertical || 'General',
+    season,
+    created: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    completed: {},
+    answers: {},
+    outputs: {}
+  };
+
+  projects.push(project);
+  saveProjects();
+  closeCreateModal();
+  openProject(project.id);
+}
+
+// ============================================================
+// PROJECT / MODULE VIEW
+// ============================================================
+
+function openProject(id) {
+  currentProjectId = id;
+  currentModuleId = 1;
+  const project = getProject(id);
+
+  document.getElementById('view-dashboard').classList.remove('active');
+  document.getElementById('view-module').classList.add('active');
+  document.getElementById('project-display-name').textContent = project.name;
+  document.getElementById('project-display-meta').textContent = `${project.vertical} · BOP ${project.season}`;
+
+  renderModuleNav();
+  renderModule(currentModuleId);
+  updateProjectCompletion();
+}
+
+function renderModuleNav() {
+  const project = getProject(currentProjectId);
+  const nav = document.getElementById('module-nav');
+  nav.innerHTML = MODULES.map(m => {
+    const isDone = project.completed && project.completed[m.id];
+    const isActive = m.id === currentModuleId;
+    const cls = `module-tab ${isActive ? 'active' : ''} ${isDone && !isActive ? 'completed' : ''}`;
+    return `
+      <button class="${cls}" onclick="switchModule(${m.id})">
+        <span style="font-size:10px;opacity:0.6;display:block;margin-bottom:2px;">MOD ${m.number}</span>
+        ${m.name}
+        ${isDone ? ' ✓' : ''}
+      </button>
+    `;
+  }).join('');
+}
+
+function switchModule(id) {
+  currentModuleId = id;
+  renderModuleNav();
+  renderModule(id);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderModule(id) {
+  const mod = MODULES.find(m => m.id === id);
+  const project = getProject(currentProjectId);
+  const isApril = mod.availability === 'april';
+  const isDone = project.completed && project.completed[id];
+  const savedAnswers = project.answers && project.answers[id] || {};
+  const savedOutput = project.outputs && project.outputs[id] || '';
+
+  const badgeClass = isDone ? 'badge-complete' : (isApril ? 'badge-april' : 'badge-june');
+  const badgeText = isDone ? '✓ Complete' : (isApril ? '● April Delivery' : '◌ June Delivery');
+
+  const questionsHTML = mod.questions.map(q => {
+    const val = savedAnswers[q.id] || '';
+    if (q.type === 'input') {
+      return `
+        <div class="question-group">
+          <label class="question-label">${q.label}</label>
+          <input class="q-input" id="q-${id}-${q.id}" type="text" placeholder="${q.placeholder}" value="${val.replace(/"/g, '&quot;')}" />
+        </div>
+      `;
+    }
+    return `
+      <div class="question-group">
+        <label class="question-label">${q.label}</label>
+        <textarea class="q-input q-textarea" id="q-${id}-${q.id}" placeholder="${q.placeholder}">${val}</textarea>
+      </div>
+    `;
+  }).join('');
+
+  const outputHTML = savedOutput ? `
+    <div class="output-card visible" id="output-card-${id}">
+      <div class="output-header">
+        <span class="output-label">⬡ BOP Intelligence Output — Module ${mod.number}</span>
+        <div class="output-actions">
+          <button class="btn-copy" onclick="copyOutput(${id})">Copy</button>
+          <button class="btn-mark-complete" onclick="markComplete(${id})">${isDone ? '✓ Complete' : 'Mark Complete'}</button>
+        </div>
+      </div>
+      <div class="output-content" id="output-content-${id}">${savedOutput}</div>
+    </div>
+  ` : `<div class="output-card" id="output-card-${id}">
+      <div class="output-header">
+        <span class="output-label">⬡ BOP Intelligence Output — Module ${mod.number}</span>
+        <div class="output-actions">
+          <button class="btn-copy" onclick="copyOutput(${id})">Copy</button>
+          <button class="btn-mark-complete" onclick="markComplete(${id})">${isDone ? '✓ Complete' : 'Mark Complete'}</button>
+        </div>
+      </div>
+      <div class="output-content" id="output-content-${id}"></div>
+    </div>`;
+
+  document.getElementById('module-content').innerHTML = `
+    <span class="module-availability-badge ${badgeClass}">${badgeText}</span>
+    <h1 class="module-title">Module ${mod.number}: ${mod.name}</h1>
+    <p class="module-desc">${mod.desc}</p>
+
+    ${(() => {
+      const priorIntel = buildPriorIntelligence(id);
+      if (priorIntel.length === 0) {
+        return `<div class="intel-context-panel intel-panel-empty">
+          <div class="intel-context-icon">◈</div>
+          <div class="intel-context-body">
+            <div class="intel-context-title">No prior module intelligence yet</div>
+            <div class="intel-context-desc">Complete earlier modules first — their findings will automatically feed into this analysis, creating a compounding intelligence picture across your BOP.</div>
+          </div>
+        </div>`;
+      }
+      const chips = priorIntel.map(p =>
+        `<div class="intel-chip">
+          <span class="intel-chip-num">M${p.number}</span>
+          <span class="intel-chip-name">${p.name}</span>
+        </div>`
+      ).join('');
+      return `<div class="intel-context-panel intel-panel-active">
+        <div class="intel-context-icon">⬡</div>
+        <div class="intel-context-body">
+          <div class="intel-context-title">Carrying forward intelligence from ${priorIntel.length} prior module${priorIntel.length > 1 ? 's' : ''}</div>
+          <div class="intel-context-desc">This analysis will build on and explicitly connect to findings from the modules below. The AI has been instructed to reference, extend, and reconcile with all prior outputs.</div>
+          <div class="intel-chips">${chips}</div>
+        </div>
+      </div>`;
+    })()}
+
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">1</div>
+        <div>
+          <div class="step-title">Answer Key Questions</div>
+          <div class="step-subtitle">Provide context specific to your show — the more precise, the stronger the output</div>
+        </div>
+      </div>
+      ${questionsHTML}
+    </div>
+
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">2</div>
+        <div>
+          <div class="step-title">Add Relevant Web Content <span style="color:var(--text-muted);font-weight:400">(Optional)</span></div>
+          <div class="step-subtitle">Provide URLs to industry articles, competitor sites, or research reports relevant to this module</div>
+        </div>
+      </div>
+      <div class="url-inputs">
+        ${[1,2,3,4,5].map(n => `<input class="q-input" id="url-${id}-${n}" type="url" placeholder="https://example.com/article" />`).join('')}
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">3</div>
+        <div>
+          <div class="step-title">Upload Supporting Documents <span style="color:var(--text-muted);font-weight:400">(Optional)</span></div>
+          <div class="step-subtitle">Post-show surveys, NPS reports, prior BOP sections, performance summaries</div>
+        </div>
+      </div>
+      <div class="drop-zone" id="drop-zone-${id}">
+        <input type="file" multiple accept=".pdf,.docx,.txt,.csv" onchange="handleFiles(event, ${id})" />
+        <div class="drop-icon">⬡</div>
+        <div class="drop-text">Drop files here or click to upload</div>
+        <div class="drop-sub">PDF, DOCX, TXT, CSV · Multiple files allowed</div>
+        <div class="file-list" id="file-list-${id}"></div>
+      </div>
+    </div>
+
+    <div class="analyze-row">
+      <button class="btn-analyze" id="btn-analyze-${id}" onclick="analyzeModule(${id})">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Analyze with AI
+      </button>
+      <button class="btn-sample" onclick="generateSample(${id})">
+        📋 Generate Sample Analysis
+      </button>
+    </div>
+
+    <div class="loading-state" id="loading-${id}">
+      <div class="loading-gem">
+        <svg viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="21,4 38,14 38,28 21,38 4,28 4,14" fill="none" stroke="#10b981" stroke-width="1.5"/>
+          <polygon points="21,4 33,14 21,24 9,14" fill="#10b981" opacity="0.7"/>
+          <polygon points="21,24 33,14 38,28 21,38" fill="#059669" opacity="0.9"/>
+          <polygon points="21,24 9,14 4,28 21,38" fill="#047857" opacity="0.9"/>
+        </svg>
+      </div>
+      <div class="loading-text">Interrogating intelligence signals…</div>
+      <div class="loading-sub">Building your BOP output for Module ${mod.number}: ${mod.name}</div>
+    </div>
+
+    ${outputHTML}
+  `;
+
+  // Restore file drop zone
+  const dropZone = document.getElementById(`drop-zone-${id}`);
+  if (dropZone) {
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      handleFilesRaw(Array.from(e.dataTransfer.files), id);
+    });
+  }
+}
+
+function handleFiles(event, moduleId) {
+  handleFilesRaw(Array.from(event.target.files), moduleId);
+}
+
+function handleFilesRaw(files, moduleId) {
+  const list = document.getElementById(`file-list-${moduleId}`);
+  files.forEach(f => {
+    const kb = Math.round(f.size / 1024);
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.innerHTML = `<span class="file-name">📄 ${f.name}</span><span class="file-size">${kb} KB</span>`;
+    list.appendChild(item);
+  });
+}
+
+function updateProjectCompletion() {
+  const project = getProject(currentProjectId);
+  const done = getCompletedCount(project);
+  const pct = Math.round((done / 13) * 100);
+  document.getElementById('project-completion-text').textContent = `${done}/13`;
+  document.getElementById('project-completion-fill').style.width = pct + '%';
+}
+
+// ============================================================
+// AI ANALYSIS
+// ============================================================
+
+function collectAnswers(moduleId) {
+  const mod = MODULES.find(m => m.id === moduleId);
+  const project = getProject(currentProjectId);
+  const answers = {};
+  mod.questions.forEach(q => {
+    const el = document.getElementById(`q-${moduleId}-${q.id}`);
+    if (el) answers[q.id] = el.value.trim();
+  });
+  return answers;
+}
+
+function buildPriorIntelligence(moduleId) {
+  const project = getProject(currentProjectId);
+  const priorOutputs = [];
+
+  // Collect all completed modules with outputs that come before this one
+  MODULES.forEach(m => {
+    if (m.id < moduleId && project.outputs && project.outputs[m.id]) {
+      // Strip HTML tags from saved output for clean text
+      const cleanText = project.outputs[m.id].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (cleanText.length > 50) {
+        priorOutputs.push({ number: m.number, name: m.name, output: cleanText });
+      }
+    }
+  });
+
+  return priorOutputs;
+}
+
+function buildPrompt(moduleId, answers) {
+  const mod = MODULES.find(m => m.id === moduleId);
+  const project = getProject(currentProjectId);
+  const priorIntel = buildPriorIntelligence(moduleId);
+
+  const qaText = mod.questions.map((q, i) => {
+    const ans = answers[q.id] || '(not provided)';
+    return `Q${i+1}: ${q.label}\nA: ${ans}`;
+  }).join('\n\n');
+
+  // Build the prior intelligence section
+  let priorIntelSection = '';
+  if (priorIntel.length > 0) {
+    const priorBlocks = priorIntel.map(p =>
+      `--- MODULE ${p.number}: ${p.name} ---\n${p.output.substring(0, 1200)}${p.output.length > 1200 ? '...[continued]' : ''}`
+    ).join('\n\n');
+
+    priorIntelSection = `
+PRIOR MODULE INTELLIGENCE (Completed upstream modules — treat as established strategic context):
+This analysis builds on findings already established for ${project.name}. You MUST reference, build upon, and reconcile with these prior findings. Do not contradict prior findings without explaining why — show how this module's analysis deepens, extends, or refines what is already known.
+
+${priorBlocks}
+
+INSTRUCTION: The above intelligence is your strategic foundation. Every finding in this module should connect back to or build on what was established upstream. Call out specific connections, tensions, or reinforcing signals between this module and prior findings.
+`;
+  } else {
+    priorIntelSection = `\nNOTE: This is the first module being analyzed. Subsequent modules will build on this output, so be thorough — your findings here become the strategic foundation for all downstream analysis.\n`;
+  }
+
+  return `You are an expert strategic planning advisor specializing in trade shows, B2B conferences, and the events industry. You are helping a Show Director at Emerald — one of the largest B2B event producers in North America — build their annual Business Operational Plan (BOP) for the 2026–2027 season.
+
+SHOW CONTEXT:
+- Show Name: ${project.name}
+- Industry/Vertical: ${project.vertical}
+- Planning Season: ${project.season}
+- Modules Previously Completed: ${priorIntel.length > 0 ? priorIntel.map(p => `Module ${p.number} (${p.name})`).join(', ') : 'None — this is the first module'}
+${priorIntelSection}
+MODULE NOW BEING ANALYZED: ${mod.number} — ${mod.name}
+MODULE PURPOSE: ${mod.desc}
+
+SHOW DIRECTOR'S INPUTS FOR THIS MODULE:
+${qaText}
+
+YOUR TASK:
+Produce a comprehensive, BOP-ready intelligence output for Module ${mod.number}: ${mod.name} that explicitly builds on all prior module intelligence above.
+
+Structure your response with clear sections using these headers:
+## Executive Summary
+## Key Intelligence Findings
+## Connections to Prior Module Findings
+## Strategic Implications for ${project.name}
+## Recommended BOP Actions
+## Questions for Leadership Alignment
+
+Requirements:
+- Write specifically for this show and vertical — no generic content
+- Be direct, analytical, and action-oriented
+- Use the Show Director's inputs as primary evidence; enrich with industry expertise
+- In "Connections to Prior Module Findings" — explicitly name which prior modules your findings reinforce, extend, or add nuance to
+- Every finding should connect to a BOP commitment or decision
+- Recommended actions should be specific, prioritized, and time-bound where possible
+- Tone: senior strategic advisor synthesizing a growing intelligence picture, not a report generator
+
+This output will be used directly in the ${project.name} BOP planning document and presented to Emerald leadership.`;
+}
+
+function getPriorIntelSummary(moduleId) {
+  const priorIntel = buildPriorIntelligence(moduleId);
+  return priorIntel;
+}
+
+async function analyzeModule(moduleId) {
+  const answers = collectAnswers(moduleId);
+  const project = getProject(currentProjectId);
+
+  // Save answers
+  if (!project.answers) project.answers = {};
+  project.answers[moduleId] = answers;
+  saveProjects();
+
+  const btn = document.getElementById(`btn-analyze-${moduleId}`);
+  const loading = document.getElementById(`loading-${moduleId}`);
+  const outputCard = document.getElementById(`output-card-${moduleId}`);
+
+  btn.disabled = true;
+  loading.classList.add('visible');
+  if (outputCard) outputCard.classList.remove('visible');
+
+  try {
+    const prompt = buildPrompt(moduleId, answers);
+    const text = await callClaude(prompt);
+    displayOutput(moduleId, text);
+  } catch (err) {
+    const msg = err.message || 'Unknown error';
+    // Format multi-line error messages clearly
+    const formatted = msg.replace(/\n/g, '<br>').replace(/chrome:\/\//g, '<code>chrome://</code>');
+    displayOutput(moduleId, `⚠ <strong>Error:</strong> ${formatted}`);
+  } finally {
+    btn.disabled = false;
+    loading.classList.remove('visible');
+  }
+}
+
+function displayOutput(moduleId, text) {
+  const project = getProject(currentProjectId);
+  if (!project.outputs) project.outputs = {};
+  project.outputs[moduleId] = text;
+  saveProjects();
+
+  const card = document.getElementById(`output-card-${moduleId}`);
+  const content = document.getElementById(`output-content-${moduleId}`);
+
+  // Format markdown-ish
+  const formatted = text
+    .replace(/## (.+)/g, '<h2>$1</h2>')
+    .replace(/### (.+)/g, '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+
+  content.innerHTML = formatted;
+  card.classList.add('visible');
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function generateSample(moduleId) {
+  const mod = MODULES.find(m => m.id === moduleId);
+  const project = getProject(currentProjectId);
+
+  const btn = document.getElementById(`btn-analyze-${moduleId}`);
+  const loading = document.getElementById(`loading-${moduleId}`);
+
+  btn.disabled = true;
+  loading.classList.add('visible');
+
+  const priorIntel = buildPriorIntelligence(moduleId);
+  let priorContext = '';
+  if (priorIntel.length > 0) {
+    const priorBlocks = priorIntel.map(p =>
+      `--- MODULE ${p.number}: ${p.name} ---\n${p.output.substring(0, 800)}${p.output.length > 800 ? '...' : ''}`
+    ).join('\n\n');
+    priorContext = `\nPRIOR MODULE FINDINGS (build upon these in your sample):\n${priorBlocks}\n`;
+  }
+
+  const samplePrompt = `You are a strategic planning expert in the trade show and B2B events industry. Generate a detailed, realistic SAMPLE BOP intelligence output for Module ${mod.number}: ${mod.name} for a fictional Emerald show called "${project.name}" in the ${project.vertical} vertical.
+
+Module Purpose: ${mod.desc}
+${priorContext}
+Create a comprehensive sample output that demonstrates what high-quality analysis looks like for this module. Use realistic trade show industry data, metrics, and strategic language. This is a demonstration output to show Show Directors what the Interrogator can produce.
+${priorIntel.length > 0 ? 'IMPORTANT: Explicitly reference and build upon the prior module findings above — show how the intelligence compounds.' : 'NOTE: This is the first module — establish strong strategic foundations that subsequent modules will build upon.'}
+
+Structure with:
+## Executive Summary
+## Key Intelligence Findings
+## Connections to Prior Module Findings
+## Strategic Implications for ${project.name}
+## Recommended BOP Actions
+## Questions for Leadership Alignment
+
+Make it specific, insightful, and immediately useful as a BOP planning document section.`;
+
+  try {
+    const text = await callClaude(samplePrompt);
+    displayOutput(moduleId, '[SAMPLE OUTPUT]\n\n' + text);
+  } catch (err) {
+    const msg = (err.message || 'Unknown error').replace(/\n/g, '<br>');
+    displayOutput(moduleId, `⚠ <strong>Error:</strong> ${msg}`);
+  } finally {
+    btn.disabled = false;
+    loading.classList.remove('visible');
+  }
+}
+
+function copyOutput(moduleId) {
+  const content = document.getElementById(`output-content-${moduleId}`);
+  if (content) {
+    const text = content.innerText || content.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.querySelector(`#output-card-${moduleId} .btn-copy`);
+      if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1500); }
+    });
+  }
+}
+
+function markComplete(moduleId) {
+  const project = getProject(currentProjectId);
+  if (!project.completed) project.completed = {};
+  project.completed[moduleId] = !project.completed[moduleId];
+  saveProjects();
+  updateProjectCompletion();
+  renderModuleNav();
+
+  const btn = document.querySelector(`#output-card-${moduleId} .btn-mark-complete`);
+  if (btn) btn.textContent = project.completed[moduleId] ? '✓ Complete' : 'Mark Complete';
+}
+
+// ============================================================
+// KEYBOARD
+// ============================================================
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeCreateModal();
+    if (_apiKey) closeApiKeyModal(); // only allow closing if key already set
+  }
+  if (e.key === 'Enter') {
+    if (document.getElementById('modal-create').classList.contains('active')) createProject();
+    if (document.getElementById('modal-apikey').classList.contains('active')) submitApiKey();
+  }
+});
+
+document.getElementById('modal-create').addEventListener('click', function(e) {
+  if (e.target === this) closeCreateModal();
+});
+
+// Only allow closing API key modal by clicking backdrop if key is already set
+document.getElementById('modal-apikey').addEventListener('click', function(e) {
+  if (e.target === this && _apiKey) closeApiKeyModal();
+});
+
+// ============================================================
+// INIT
+// ============================================================
+
+renderDashboard();
+
+// Show API key modal on load - GitHub Pages serves over https so modal works perfectly
+openApiKeyModal();
+</script>
+</body>
+</html>
