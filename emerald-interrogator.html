@@ -1564,54 +1564,42 @@ async function callClaude(prompt) {
     throw new Error('API key required. Please enter your Anthropic API key.');
   }
 
-  // Use XMLHttpRequest instead of fetch — works from file:// in most browsers
-  // with the dangerously-allow-browser header for direct API access
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', 'https://api.anthropic.com/v1/messages', true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('x-api-key', key);
-    xhr.setRequestHeader('anthropic-version', '2023-06-01');
-    xhr.setRequestHeader('anthropic-beta', 'dangerously-allow-browser');
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'dangerously-allow-browser'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2500,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
 
-    xhr.onload = function() {
-      try {
-        const data = JSON.parse(xhr.responseText);
-        if (xhr.status === 200) {
-          resolve(data.content?.map(b => b.text || '').join('') || 'No output received.');
-        } else {
-          if (xhr.status === 401) {
-            _apiKey = '';
-            updateApiStatus(false);
-            openApiKeyModal();
-            reject(new Error('Invalid API key. Please re-enter your Anthropic API key.'));
-          } else {
-            reject(new Error(data?.error?.message || `HTTP ${xhr.status}`));
-          }
-        }
-      } catch(e) {
-        reject(new Error('Failed to parse API response.'));
-      }
-    };
+    const data = await response.json();
 
-    xhr.onerror = function() {
-      // If XHR also blocked, give clear instructions
-      reject(new Error(
-        'Connection blocked by browser security.\n\n' +
-        'TO FIX: Open Chrome and paste this into the address bar:\n' +
-        'chrome://flags/#block-insecure-private-network-requests\n\n' +
-        'OR simply open the file in Firefox — Firefox allows this by default.\n\n' +
-        'OR right-click Chrome shortcut → Properties → add to Target field:\n' +
-        '--allow-file-access-from-files --disable-web-security --user-data-dir="%TEMP%\\chrome-dev"'
-      ));
-    };
-
-    xhr.send(JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2500,
-      messages: [{ role: 'user', content: prompt }]
-    }));
-  });
+    if (response.status === 200) {
+      return data.content?.map(b => b.text || '').join('') || 'No output received.';
+    } else if (response.status === 401) {
+      _apiKey = '';
+      updateApiStatus(false);
+      openApiKeyModal();
+      throw new Error('Invalid API key — please re-enter your key and try again.');
+    } else if (response.status === 529 || response.status === 503) {
+      throw new Error('The AI service is temporarily overloaded. Please wait 30 seconds and try again.');
+    } else {
+      throw new Error(data?.error?.message || `API error (HTTP ${response.status}). Please try again.`);
+    }
+  } catch(err) {
+    if (err.message.includes('fetch') || err.name === 'TypeError') {
+      throw new Error('Network request blocked. Please ask your IT team to whitelist api.anthropic.com on the Emerald network, or try from a non-Emerald network connection.');
+    }
+    throw err;
+  }
 }
 
 // ============================================================
