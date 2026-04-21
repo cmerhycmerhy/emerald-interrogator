@@ -1493,7 +1493,7 @@ function updateApiStatus(connected) {
   }
 }
 
-// Cloudflare Worker proxy URL - replace YOUR-SUBDOMAIN after deploying the worker
+// Cloudflare Worker proxy URL
 const PROXY_URL = 'https://emerald-interrogator.cmerhy.workers.dev';
 
 async function callClaude(prompt) {
@@ -2278,67 +2278,66 @@ function buildPrompt(moduleId, answers, documentContext) {
   const commentaryText = answers['commentary'] ? `\nSHOW DIRECTOR OPEN COMMENTARY:\n${answers['commentary']}\n` : '';
 
   // Prior intel
-  let priorIntelSection = '';
+  var priorIntelSection = '';
   if (priorIntel.length > 0) {
-    const priorBlocks = priorIntel.map(p => `--- MODULE ${p.number}: ${p.name} ---\n${p.output.substring(0,1200)}${p.output.length>1200?'...[continued]':''}`).join('\n\n');
-    priorIntelSection = `\nPRIOR MODULE INTELLIGENCE (established strategic context — build on this):\n${priorBlocks}\n\nINSTRUCTION: The above is your strategic foundation. Every finding must connect back to or build on what was established upstream.\n`;
+    var priorBlocks = priorIntel.map(function(p) {
+      return '--- MODULE ' + p.number + ': ' + p.name + ' ---\n' +
+        p.output.substring(0, 1200) + (p.output.length > 1200 ? '...[continued]' : '');
+    }).join('\n\n');
+    priorIntelSection = '\nPRIOR MODULE INTELLIGENCE (established strategic context — build on this):\n' +
+      priorBlocks +
+      '\n\nINSTRUCTION: The above is your strategic foundation. Every finding must connect back to or build on what was established upstream.\n';
   } else {
-    priorIntelSection = `\nNOTE: This is the first module. Be thorough — your findings here become the strategic foundation for all downstream analysis.\n`;
+    priorIntelSection = '\nNOTE: This is the first module. Be thorough — your findings here become the strategic foundation for all downstream analysis.\n';
+  }
+  // Document context section
+  var docSection;
+  if (documentContext && documentContext.trim()) {
+    var truncated = documentContext.length > 40000 ? documentContext.substring(0, 40000) + '\n[Additional content truncated for length]' : documentContext;
+    docSection = 'SUPPORTING DOCUMENTS & URLS (Read and cite specific data from these in your analysis):\n' +
+      truncated +
+      '\n\nCRITICAL INSTRUCTION: The above documents and URLs contain real proprietary data from the Show Director. You MUST read, reference, and cite specific facts, figures, and insights from these documents throughout your analysis. Do not ignore them. When you use data from a document, note the source (e.g., Per the RFID Pacing Report or According to the media plan).';
+  } else {
+    docSection = 'NOTE: No supporting documents or URLs were provided for this module.';
   }
 
-  // Document context section
-  const docSection = documentContext && documentContext.trim()
-    ? `
-SUPPORTING DOCUMENTS & URLS (Read and cite specific data from these in your analysis):
-${documentContext.substring(0, 40000)}${documentContext.length > 40000 ? '
-[Additional content truncated for length]' : ''}
-
-CRITICAL INSTRUCTION: The above documents and URLs contain real proprietary data from the Show Director. You MUST read, reference, and cite specific facts, figures, and insights from these documents throughout your analysis. Do not ignore them. When you use data from a document, note the source (e.g., "Per the RFID Pacing Report..." or "According to the media plan...").`
-    : '
-NOTE: No supporting documents or URLs were provided for this module.';
-
-  return `You are a senior strategic planning advisor specializing in trade shows, B2B conferences, and the events industry. You are helping a Show Director at Emerald Expositions — one of the largest B2B event producers in North America — build their annual Business Operational Plan (BOP) for the 2026–2027 season.
-
-SHOW CONTEXT:
-- Show Name: ${project.name}
-- Industry/Vertical: ${project.vertical}
-- Planning Season: ${project.season}
-- Prior Modules Completed: ${priorIntel.length > 0 ? priorIntel.map(p=>`Module ${p.number} (${p.name})`).join(', ') : 'None — this is the first module'}
-${priorIntelSection}
-${docSection}
-MODULE BEING ANALYZED: ${mod.number} — ${mod.name}
-PURPOSE: ${mod.desc}
-${anchorText}
-SHOW DIRECTOR'S INPUTS:
-${qaText}
-${commentaryText}
-
-YOUR TASK:
-Produce a comprehensive, BOP-ready intelligence output for Module ${mod.number}: ${mod.name} that explicitly builds on all prior intelligence.
-
-Structure your response with these exact headers:
-## Executive Summary
-## Key Intelligence Findings
-## AI-Inferred Intelligence (questions not answered by Show Director)
-## Connections to Prior Module Findings
-## Strategic Implications for ${project.name}
-## Recommended BOP Actions
-## Questions for Leadership Alignment
-
-Note: The "AI-Inferred Intelligence" section should only appear if one or more questions were left blank. For each inferred item, state the question, your inference, the basis for it (industry knowledge, vertical expertise, analogous events), and what the Show Director should do to validate or correct it.
-
-Requirements:
-- Write specifically for this show and vertical — no generic content
-- Weight anchor question responses heavily — they reflect the Show Director's strategic instinct
-- Incorporate open commentary naturally into the analysis
-- CRITICAL — GAP FILLING: Where a question is marked [NOT PROVIDED], do not skip it. Instead, apply your expertise in the trade show industry, knowledge of the ${project.vertical} vertical, and any relevant prior module intelligence to research and provide the best available answer. Clearly prefix every inferred finding with "AI-Inferred:" so leadership can distinguish sourced from synthesized intelligence. Inferred content should be treated as a hypothesis to be validated, not confirmed fact.
-- In "Connections to Prior Module Findings" — explicitly name which prior modules your findings build on
-- Be direct, analytical, and action-oriented
-- Every finding should connect to a BOP commitment or decision
-- Recommended actions should be specific, prioritized, and time-bound where possible
-- Tone: senior strategic advisor synthesizing a growing intelligence picture — filling gaps is part of the job, not a limitation
-
-This output will be used directly in the ${project.name} BOP planning document and presented to Emerald leadership.`;
+  return 'You are a senior strategic planning advisor specializing in trade shows, B2B conferences, and the events industry. You are helping a Show Director at Emerald Expositions — one of the largest B2B event producers in North America — build their annual Business Operational Plan (BOP) for the 2026–2027 season.\n\n' +
+    'SHOW CONTEXT:\n' +
+    '- Show Name: ' + project.name + '\n' +
+    '- Industry/Vertical: ' + project.vertical + '\n' +
+    '- Planning Season: ' + project.season + '\n' +
+    '- Prior Modules Completed: ' + (priorIntel.length > 0 ? priorIntel.map(function(p) { return 'Module ' + p.number + ' (' + p.name + ')'; }).join(', ') : 'None — this is the first module') + '\n' +
+    priorIntelSection + '\n' +
+    docSection + '\n' +
+    'MODULE BEING ANALYZED: ' + mod.number + ' — ' + mod.name + '\n' +
+    'PURPOSE: ' + mod.desc + '\n' +
+    anchorText + '\n' +
+    'SHOW DIRECTOR\'S INPUTS:\n' +
+    qaText + '\n' +
+    commentaryText + '\n' +
+    'YOUR TASK:\n' +
+    'Produce a comprehensive, BOP-ready intelligence output for Module ' + mod.number + ': ' + mod.name + ' that explicitly builds on all prior intelligence.\n\n' +
+    'Structure your response with these exact headers:\n' +
+    '## Executive Summary\n' +
+    '## Key Intelligence Findings\n' +
+    '## AI-Inferred Intelligence (questions not answered by Show Director)\n' +
+    '## Connections to Prior Module Findings\n' +
+    '## Strategic Implications for ' + project.name + '\n' +
+    '## Recommended BOP Actions\n' +
+    '## Questions for Leadership Alignment\n\n' +
+    'Note: The AI-Inferred Intelligence section should only appear if one or more questions were left blank. For each inferred item, state the question, your inference, the basis for it, and what the Show Director should do to validate or correct it.\n\n' +
+    'Requirements:\n' +
+    '- Write specifically for this show and vertical — no generic content\n' +
+    '- Weight anchor question responses heavily — they reflect the Show Director\'s strategic instinct\n' +
+    '- Incorporate open commentary naturally into the analysis\n' +
+    '- CRITICAL — GAP FILLING: Where a question is marked [NOT PROVIDED], apply your expertise to research and provide the best available answer. Clearly prefix every inferred finding with AI-Inferred: so leadership can distinguish sourced from synthesized intelligence.\n' +
+    '- If supporting documents or URLs were provided, read them carefully and cite specific data, figures, and insights from them throughout your analysis\n' +
+    '- In Connections to Prior Module Findings — explicitly name which prior modules your findings build on\n' +
+    '- Be direct, analytical, and action-oriented\n' +
+    '- Every finding should connect to a BOP commitment or decision\n' +
+    '- Recommended actions should be specific, prioritized, and time-bound where possible\n' +
+    '- Tone: senior strategic advisor synthesizing a growing intelligence picture — filling gaps is part of the job, not a limitation\n\n' +
+    'This output will be used directly in the ' + project.name + ' BOP planning document and presented to Emerald leadership.'
 }
 
 async function analyzeModule(moduleId) {
@@ -2935,6 +2934,18 @@ function buildEOCDRecord(count, size, offset) {
     u16le(0), u16le(0), u16le(count), u16le(count),
     u32le(size), u32le(offset), u16le(0)
   ]);
+}
+
+
+function markComplete(moduleId) {
+  const project = getProject(currentProjectId);
+  if (!project.completed) project.completed = {};
+  project.completed[moduleId] = !project.completed[moduleId];
+  saveProjects();
+  updateProjectCompletion();
+  renderModuleNav();
+  const btn = document.querySelector('#output-card-' + moduleId + ' .btn-mark-complete');
+  if (btn) btn.textContent = project.completed[moduleId] ? '✓ Complete' : 'Mark Complete';
 }
 
 // ============================================================
