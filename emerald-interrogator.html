@@ -2578,33 +2578,24 @@ function exportPPT(moduleId) {
   var project = info.project;
   var date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-  var sections = parseSections(text);
-  var slides = [];
-
-  // Title slide
-  slides.push(makeTitleSlide(project.name, 'Module ' + mod.number + ': ' + mod.name, 'BOP ' + project.season + ' · ' + date));
-
-  // Content slides - one per section
-  sections.forEach(function(section) {
-    var chunks = [];
-    var maxPer = 6;
-    for (var i = 0; i < section.bullets.length; i += maxPer) {
-      chunks.push(section.bullets.slice(i, i + maxPer));
-    }
-    if (chunks.length === 0) chunks.push([]);
-    chunks.forEach(function(chunk, ci) {
-      var t = section.title + (chunks.length > 1 ? ' (' + (ci+1) + '/' + chunks.length + ')' : '');
-      slides.push(makeContentSlide(t, chunk));
-    });
-  });
-
-  // Closing slide
-  slides.push(makeTitleSlide(project.name, 'Module ' + mod.number + ' Complete', 'Emerald Interrogator · BOP Intelligence Platform'));
-
-  var files = buildPPTXFiles(slides, project.name);
-  var blob = zipToBlob(files, 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-  var fname = project.name.replace(/[^a-z0-9]/gi,'_') + '_Module' + mod.number + '_' + mod.name.replace(/[^a-z0-9]/gi,'_') + '.pptx';
-  downloadBlob(blob, fname);
+  // Load PptxGenJS from CDN then generate
+  if (window.PptxGenJS) {
+    generatePPTX(text, mod, project, date);
+  } else {
+    var btn = document.querySelector('#output-card-' + moduleId + ' .btn-export.ppt');
+    if (btn) btn.textContent = '⏳ Loading…';
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js';
+    script.onload = function() {
+      if (btn) btn.textContent = '📊 PowerPoint (.pptx)';
+      generatePPTX(text, mod, project, date);
+    };
+    script.onerror = function() {
+      if (btn) btn.textContent = '📊 PowerPoint (.pptx)';
+      alert('Could not load PowerPoint library. Please check your internet connection and try again.');
+    };
+    document.head.appendChild(script);
+  }
 }
 
 function parseSections(text) {
@@ -2614,221 +2605,148 @@ function parseSections(text) {
     var t = line.trim();
     if (t.indexOf('## ') === 0) {
       if (current) sections.push(current);
-      current = { title: t.replace('## ',''), bullets: [] };
+      current = { title: t.replace('## ', ''), bullets: [] };
     } else if (current && t && t.indexOf('###') !== 0) {
-      var clean = t.replace(/^[-•] /,'').replace(/\*\*/g,'');
-      if (clean.length > 8) current.bullets.push(clean.substring(0, 200));
+      var clean = t.replace(/^[-•] /, '').replace(/\*\*/g, '');
+      if (clean.length > 8) current.bullets.push(clean.substring(0, 250));
     }
   });
   if (current) sections.push(current);
   return sections;
 }
 
-function makeTitleSlide(title, subtitle, meta) {
-  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"' +
-    ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' +
-    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-    '<p:cSld>' +
-    '<p:bg><p:bgPr><a:solidFill><a:srgbClr val="025157"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>' +
-    '<p:spTree>' +
-    '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
-    '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="5143500"/></a:xfrm></p:grpSpPr>' +
-    '<p:sp><p:nvSpPr><p:cNvPr id="2" name="accent"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
-    '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="137160" cy="5143500"/></a:xfrm>' +
-    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="91D500"/></a:solidFill></p:spPr>' +
-    '<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>' +
-    makeTextBox(3, 'Title', 457200, 1200000, 8229600, 900000, xmlEsc(title), '3600', 'FFFFFF', '1', 'Georgia') +
-    makeTextBox(4, 'Subtitle', 457200, 2200000, 8229600, 600000, xmlEsc(subtitle), '2400', '91D500', '0', 'Georgia') +
-    makeTextBox(5, 'Meta', 457200, 2900000, 8229600, 400000, xmlEsc(meta), '1400', 'AACCCC', '0', 'Calibri') +
-    '</p:spTree></p:cSld></p:sld>';
-}
+function generatePPTX(text, mod, project, date) {
+  var pptx = new window.PptxGenJS();
+  pptx.layout = 'LAYOUT_16x9';
+  pptx.title = project.name + ' — Module ' + mod.number + ': ' + mod.name;
 
-function makeContentSlide(title, bullets) {
-  var bulletXML = bullets.map(function(b) {
-    return '<a:p>' +
-      '<a:pPr marL="342900" indent="-342900"><a:buChar char="&#x25CF;"/>' +
-      '<a:spcBef><a:spcPts val="120"/></a:spcBef></a:pPr>' +
-      '<a:r><a:rPr lang="en-US" sz="1500" dirty="0">' +
-      '<a:solidFill><a:srgbClr val="444444"/></a:solidFill>' +
-      '<a:latin typeface="Calibri"/></a:rPr>' +
-      '<a:t>' + xmlEsc(b) + '</a:t></a:r></a:p>';
-  }).join('');
+  var DARK_AQUA = '025157';
+  var GREEN     = '91D500';
+  var AQUA      = '008098';
+  var WHITE     = 'FFFFFF';
+  var LIGHT_BG  = 'F0F4F5';
+  var TEXT_GRAY = '444444';
 
-  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"' +
-    ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' +
-    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-    '<p:cSld>' +
-    '<p:bg><p:bgPr><a:solidFill><a:srgbClr val="F0F4F5"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>' +
-    '<p:spTree>' +
-    '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
-    '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="5143500"/></a:xfrm></p:grpSpPr>' +
-    '<p:sp><p:nvSpPr><p:cNvPr id="2" name="hdr"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
-    '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="685800"/></a:xfrm>' +
-    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="025157"/></a:solidFill></p:spPr>' +
-    '<p:txBody><a:bodyPr anchor="ctr"/><a:lstStyle/>' +
-    '<a:p><a:pPr algn="l" marL="457200"/>' +
-    '<a:r><a:rPr lang="en-US" sz="1900" b="1" dirty="0">' +
-    '<a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>' +
-    '<a:latin typeface="Georgia"/></a:rPr>' +
-    '<a:t>' + xmlEsc(title) + '</a:t></a:r></a:p>' +
-    '</p:txBody></p:sp>' +
-    '<p:sp><p:nvSpPr><p:cNvPr id="3" name="bar"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
-    '<p:spPr><a:xfrm><a:off x="0" y="685800"/><a:ext cx="9144000" cy="45720"/></a:xfrm>' +
-    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="91D500"/></a:solidFill></p:spPr>' +
-    '<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>' +
-    '<p:sp><p:nvSpPr><p:cNvPr id="4" name="content"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
-    '<p:spPr><a:xfrm><a:off x="457200" y="800000"/><a:ext cx="8229600" cy="4200000"/></a:xfrm>' +
-    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>' +
-    '<p:txBody><a:bodyPr/><a:lstStyle/>' +
-    (bulletXML || '<a:p/>') +
-    '</p:txBody></p:sp>' +
-    '</p:spTree></p:cSld></p:sld>';
-}
+  // ── TITLE SLIDE ──
+  var titleSlide = pptx.addSlide();
+  titleSlide.background = { color: DARK_AQUA };
 
-function makeTextBox(id, name, x, y, cx, cy, text, sz, color, bold, font) {
-  return '<p:sp><p:nvSpPr><p:cNvPr id="' + id + '" name="' + name + '"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
-    '<p:spPr><a:xfrm><a:off x="' + x + '" y="' + y + '"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm>' +
-    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>' +
-    '<p:txBody><a:bodyPr/><a:lstStyle/><a:p>' +
-    '<a:r><a:rPr lang="en-US" sz="' + sz + '" b="' + bold + '" dirty="0">' +
-    '<a:solidFill><a:srgbClr val="' + color + '"/></a:solidFill>' +
-    '<a:latin typeface="' + font + '"/></a:rPr>' +
-    '<a:t>' + text + '</a:t></a:r></a:p></p:txBody></p:sp>';
-}
-
-function buildPPTXFiles(slides, showName) {
-  var slideXMLs = {};
-  var slideRels = {};
-  var sldIdLst = '';
-
-  slides.forEach(function(xml, i) {
-    var n = i + 1;
-    slideXMLs['ppt/slides/slide' + n + '.xml'] = xml;
-    slideRels['ppt/slides/_rels/slide' + n + '.xml.rels'] =
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>' +
-      '</Relationships>';
-    sldIdLst += '<p:sldId id="' + (256+i) + '" r:id="rId' + n + '"/>';
+  // Green accent bar left
+  titleSlide.addShape(pptx.shapes.RECTANGLE, {
+    x: 0, y: 0, w: 0.14, h: 5.625,
+    fill: { color: GREEN }, line: { color: GREEN }
   });
 
-  var slideOverrides = slides.map(function(_, i) {
-    return '<Override PartName="/ppt/slides/slide' + (i+1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>';
-  }).join('');
+  titleSlide.addText(project.name, {
+    x: 0.4, y: 1.2, w: 9.2, h: 1.0,
+    fontSize: 36, bold: true, color: WHITE,
+    fontFace: 'Georgia', align: 'left'
+  });
 
-  var slideRelEntries = slides.map(function(_, i) {
-    return '<Relationship Id="rId' + (i+1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide' + (i+1) + '.xml"/>';
-  }).join('');
+  titleSlide.addText('Module ' + mod.number + ': ' + mod.name, {
+    x: 0.4, y: 2.3, w: 9.2, h: 0.65,
+    fontSize: 24, color: GREEN, italic: true,
+    fontFace: 'Georgia', align: 'left'
+  });
 
-  var n = slides.length;
+  titleSlide.addText('BOP ' + project.season + '  ·  ' + date, {
+    x: 0.4, y: 3.1, w: 9.2, h: 0.4,
+    fontSize: 14, color: 'AACCCC',
+    fontFace: 'Calibri', align: 'left'
+  });
 
-  var files = {
-    '[Content_Types].xml':
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
-      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
-      '<Default Extension="xml" ContentType="application/xml"/>' +
-      '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>' +
-      '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>' +
-      '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>' +
-      '<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>' +
-      slideOverrides + '</Types>',
+  titleSlide.addText('Prepared by Emerald Interrogator  ·  BOP Intelligence Platform', {
+    x: 0, y: 5.2, w: 10, h: 0.3,
+    fontSize: 10, color: 'AACCCC',
+    fontFace: 'Calibri', align: 'center',
+    fill: { color: AQUA, transparency: 70 }
+  });
 
-    '_rels/.rels':
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>' +
-      '</Relationships>',
+  // ── PARSE SECTIONS ──
+  var sections = parseSections(text);
 
-    'ppt/presentation.xml':
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"' +
-      ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' +
-      ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-      '<p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId' + (n+1) + '"/></p:sldMasterIdLst>' +
-      '<p:sldIdLst>' + sldIdLst + '</p:sldIdLst>' +
-      '<p:sldSz cx="9144000" cy="5143500" type="screen16x9"/>' +
-      '<p:notesSz cx="6858000" cy="9144000"/>' +
-      '</p:presentation>',
+  // ── CONTENT SLIDES ──
+  sections.forEach(function(section) {
+    var maxPer = 6;
+    var chunks = [];
+    for (var i = 0; i < Math.max(section.bullets.length, 1); i += maxPer) {
+      chunks.push(section.bullets.slice(i, i + maxPer));
+    }
 
-    'ppt/_rels/presentation.xml.rels':
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      slideRelEntries +
-      '<Relationship Id="rId' + (n+1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>' +
-      '<Relationship Id="rId' + (n+2) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>' +
-      '</Relationships>',
+    chunks.forEach(function(chunk, ci) {
+      var slideTitle = section.title + (chunks.length > 1 ? ' (' + (ci+1) + '/' + chunks.length + ')' : '');
+      var slide = pptx.addSlide();
+      slide.background = { color: LIGHT_BG };
 
-    'ppt/slideMasters/slideMaster1.xml':
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"' +
-      ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' +
-      ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-      '<p:cSld><p:spTree>' +
-      '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
-      '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="5143500"/></a:xfrm></p:grpSpPr>' +
-      '</p:spTree></p:cSld>' +
-      '<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>' +
-      '<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst>' +
-      '<p:txStyles>' +
-      '<p:titleStyle><a:lvl1pPr><a:defRPr/></a:lvl1pPr></p:titleStyle>' +
-      '<p:bodyStyle><a:lvl1pPr><a:defRPr/></a:lvl1pPr></p:bodyStyle>' +
-      '<p:otherStyle><a:lvl1pPr><a:defRPr/></a:lvl1pPr></p:otherStyle>' +
-      '</p:txStyles></p:sldMaster>',
+      // Header bar
+      slide.addShape(pptx.shapes.RECTANGLE, {
+        x: 0, y: 0, w: 10, h: 0.75,
+        fill: { color: DARK_AQUA }, line: { color: DARK_AQUA }
+      });
 
-    'ppt/slideMasters/_rels/slideMaster1.xml.rels':
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>' +
-      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>' +
-      '</Relationships>',
+      // Green accent under header
+      slide.addShape(pptx.shapes.RECTANGLE, {
+        x: 0, y: 0.75, w: 10, h: 0.06,
+        fill: { color: GREEN }, line: { color: GREEN }
+      });
 
-    'ppt/slideLayouts/slideLayout1.xml':
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"' +
-      ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' +
-      ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" type="blank">' +
-      '<p:cSld name="Blank"><p:spTree>' +
-      '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
-      '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="5143500"/></a:xfrm></p:grpSpPr>' +
-      '</p:spTree></p:cSld>' +
-      '</p:sldLayout>',
+      // Slide title
+      slide.addText(slideTitle, {
+        x: 0.3, y: 0.08, w: 9.4, h: 0.6,
+        fontSize: 18, bold: true, color: WHITE,
+        fontFace: 'Georgia', align: 'left', valign: 'middle'
+      });
 
-    'ppt/slideLayouts/_rels/slideLayout1.xml.rels':
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>' +
-      '</Relationships>',
+      // Bullet content
+      if (chunk.length > 0) {
+        var bulletItems = chunk.map(function(b) {
+          return { text: b, options: { bullet: true, fontSize: 15, color: TEXT_GRAY, fontFace: 'Calibri', breakLine: true, paraSpaceAfter: 8 } };
+        });
+        slide.addText(bulletItems, {
+          x: 0.4, y: 0.95, w: 9.2, h: 4.5,
+          valign: 'top'
+        });
+      }
 
-    'ppt/theme/theme1.xml':
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Emerald">' +
-      '<a:themeElements>' +
-      '<a:clrScheme name="Emerald">' +
-      '<a:dk1><a:srgbClr val="025157"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>' +
-      '<a:dk2><a:srgbClr val="008098"/></a:dk2><a:lt2><a:srgbClr val="EDF1F4"/></a:lt2>' +
-      '<a:accent1><a:srgbClr val="91D500"/></a:accent1>' +
-      '<a:accent2><a:srgbClr val="FF671D"/></a:accent2>' +
-      '<a:hlink><a:srgbClr val="008098"/></a:hlink>' +
-      '<a:folHlink><a:srgbClr val="025157"/></a:folHlink>' +
-      '</a:clrScheme>' +
-      '<a:fontScheme name="Emerald">' +
-      '<a:majorFont><a:latin typeface="Georgia"/></a:majorFont>' +
-      '<a:minorFont><a:latin typeface="Calibri"/></a:minorFont>' +
-      '</a:fontScheme>' +
-      '<a:fmtScheme name="Office">' +
-      '<a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst>' +
-      '<a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst>' +
-      '<a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst>' +
-      '<a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst>' +
-      '</a:fmtScheme>' +
-      '</a:themeElements></a:theme>'
-  };
+      // Footer
+      slide.addText(project.name + '  ·  Module ' + mod.number + '  ·  ' + date, {
+        x: 0, y: 5.35, w: 10, h: 0.2,
+        fontSize: 9, color: '888888',
+        fontFace: 'Calibri', align: 'center'
+      });
+    });
+  });
 
-  Object.assign(files, slideXMLs, slideRels);
-  return files;
+  // ── CLOSING SLIDE ──
+  var closingSlide = pptx.addSlide();
+  closingSlide.background = { color: DARK_AQUA };
+
+  closingSlide.addShape(pptx.shapes.RECTANGLE, {
+    x: 0, y: 0, w: 0.14, h: 5.625,
+    fill: { color: GREEN }, line: { color: GREEN }
+  });
+
+  closingSlide.addText(project.name, {
+    x: 0.4, y: 1.5, w: 9.2, h: 0.8,
+    fontSize: 32, bold: true, color: WHITE,
+    fontFace: 'Georgia', align: 'left'
+  });
+
+  closingSlide.addText('Module ' + mod.number + ' Complete', {
+    x: 0.4, y: 2.5, w: 9.2, h: 0.6,
+    fontSize: 22, color: GREEN, italic: true,
+    fontFace: 'Georgia', align: 'left'
+  });
+
+  closingSlide.addText('Emerald Interrogator  ·  BOP Intelligence Platform', {
+    x: 0.4, y: 3.2, w: 9.2, h: 0.4,
+    fontSize: 14, color: 'AACCCC',
+    fontFace: 'Calibri', align: 'left'
+  });
+
+  // ── SAVE ──
+  var fname = project.name.replace(/[^a-z0-9]/gi, '_') + '_Module' + mod.number + '_' + mod.name.replace(/[^a-z0-9]/gi, '_') + '.pptx';
+  pptx.writeFile({ fileName: fname });
 }
 
 // ── DOWNLOAD HELPER ───────────────────────────────────────────
