@@ -1458,18 +1458,19 @@ function updateApiStatus(connected) {
   }
 }
 
+// Cloudflare Worker proxy URL - replace YOUR-SUBDOMAIN after deploying the worker
+const PROXY_URL = 'https://emerald-interrogator.cmerhy.workers.dev';
+
 async function callClaude(prompt) {
   const key = getApiKey();
   if (!key) { openApiKeyModal(); throw new Error('API key required.'); }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(PROXY_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'dangerously-allow-browser'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
@@ -1485,7 +1486,7 @@ async function callClaude(prompt) {
     throw new Error(data?.error?.message || `API error (HTTP ${response.status}).`);
   } catch(err) {
     if (err.message.includes('fetch') || err.name === 'TypeError') {
-      throw new Error('Network request blocked. Please ask your IT team to whitelist api.anthropic.com on port 443, or try from a non-corporate network connection.');
+      throw new Error('Connection error. Please check your internet connection and try again.');
     }
     throw err;
   }
