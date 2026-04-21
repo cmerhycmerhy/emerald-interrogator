@@ -1171,6 +1171,41 @@
 
   .btn-mark-complete:hover { background: var(--em-green); }
 
+  .export-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-top: 16px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .export-label {
+    font-size: 11px; font-weight: 800;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: flex; align-items: center;
+    margin-right: 4px;
+  }
+
+  .btn-export {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg-elevated);
+    border: 1.5px solid var(--border-mid);
+    color: var(--text-body);
+    font-family: var(--font-body);
+    font-size: 11px; font-weight: 800;
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .btn-export:hover { border-color: var(--em-dark-aqua); color: var(--em-dark-aqua); background: #fff; }
+  .btn-export.word:hover { border-color: #2B5797; color: #2B5797; }
+  .btn-export.ppt:hover { border-color: #D04423; color: #D04423; }
+  .btn-export.copy-btn:hover { border-color: var(--em-aqua); color: var(--em-aqua); }
+
   .output-content {
     font-size: 14px; color: var(--text-body);
     line-height: 1.75; white-space: pre-wrap;
@@ -1861,11 +1896,16 @@ function renderModule(id) {
     <div class="output-header">
       <span class="output-label">◉ BOP Intelligence Output — Module ${mod.number}</span>
       <div class="output-actions">
-        <button class="btn-copy" onclick="copyOutput(${id})">Copy</button>
         <button class="btn-mark-complete" onclick="markComplete(${id})">${isDone?'✓ Complete':'Mark Complete'}</button>
       </div>
     </div>
     <div class="output-content" id="output-content-${id}">${savedOutput}</div>
+    <div class="export-row">
+      <span class="export-label">Export:</span>
+      <button class="btn-export word" onclick="exportWord(${id})">📄 Word (.docx)</button>
+      <button class="btn-export ppt" onclick="exportPPT(${id})">📊 PowerPoint (.pptx)</button>
+      <button class="btn-export copy-btn" onclick="copyOutput(${id})" id="copy-btn-${id}">📋 Copy Text</button>
+    </div>
   </div>`;
 
   document.getElementById('module-content').innerHTML = `
@@ -1926,10 +1966,10 @@ function renderModule(id) {
         </div>
       </div>
       <div class="drop-zone" id="drop-zone-${id}">
-        <input type="file" multiple accept=".pdf,.docx,.txt,.csv" onchange="handleFiles(event,${id})" />
+        <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" onchange="handleFiles(event,${id})" />
         <div class="drop-icon">📁</div>
         <div class="drop-text">Drop files here or click to upload</div>
-        <div class="drop-sub">PDF, DOCX, TXT, CSV · Multiple files allowed</div>
+        <div class="drop-sub">PDF · Word · Excel · PowerPoint · TXT · CSV · Multiple files allowed</div>
         <div class="file-list" id="file-list-${id}"></div>
       </div>
     </div>
@@ -1968,17 +2008,202 @@ function renderModule(id) {
   }
 }
 
+// File storage — keyed by moduleId
+const moduleFiles = {};
+
 function handleFiles(event, moduleId) { handleFilesRaw(Array.from(event.target.files), moduleId); }
 
 function handleFilesRaw(files, moduleId) {
+  if (!moduleFiles[moduleId]) moduleFiles[moduleId] = [];
   const list = document.getElementById(`file-list-${moduleId}`);
   files.forEach(f => {
+    moduleFiles[moduleId].push(f);
     const kb = Math.round(f.size/1024);
     const item = document.createElement('div');
     item.className = 'file-item';
-    item.innerHTML = `<span class="file-name">📄 ${f.name}</span><span class="file-size">${kb} KB</span>`;
+    item.innerHTML = `<span class="file-name">📄 ${f.name}</span><span class="file-size">${kb} KB ✓ Queued for AI</span>`;
     list.appendChild(item);
   });
+}
+
+async function extractFileContent(file) {
+  const name = file.name.toLowerCase();
+  const ext = name.split('.').pop();
+
+  try {
+    // Plain text formats — read directly
+    if (['txt', 'csv', 'md'].includes(ext)) {
+      return await file.text();
+    }
+
+    // PDF — extract text using pdf.js via CDN
+    if (ext === 'pdf') {
+      return await extractPDF(file);
+    }
+
+    // Word, Excel, PowerPoint — read as binary and extract what text we can
+    if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
+      return await extractOffice(file);
+    }
+
+    return `[File: ${file.name} — format not fully supported for text extraction, filename included for context]`;
+  } catch(e) {
+    return `[File: ${file.name} — could not extract text: ${e.message}]`;
+  }
+}
+
+async function extractPDF(file) {
+  try {
+    // Load pdf.js dynamically
+    if (!window.pdfjsLib) {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let text = `[PDF: ${file.name}]\n`;
+
+    const maxPages = Math.min(pdf.numPages, 30); // cap at 30 pages
+    for (let i = 1; i <= maxPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(item => item.str).join(' ');
+      if (pageText.trim()) text += `\nPage ${i}: ${pageText}`;
+    }
+
+    if (pdf.numPages > 30) text += `\n[Note: Document has ${pdf.numPages} pages — first 30 extracted]`;
+    return text;
+  } catch(e) {
+    return `[PDF: ${file.name} — extraction error: ${e.message}]`;
+  }
+}
+
+async function extractOffice(file) {
+  try {
+    // Load mammoth for Word docs
+    const name = file.name.toLowerCase();
+    const ext = name.split('.').pop();
+
+    if (['doc', 'docx'].includes(ext)) {
+      if (!window.mammoth) {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+      }
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await window.mammoth.extractRawText({ arrayBuffer });
+      return `[Word Document: ${file.name}]\n${result.value}`;
+    }
+
+    if (['xls', 'xlsx'].includes(ext)) {
+      if (!window.XLSX) {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+      }
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+      let text = `[Excel File: ${file.name}]\n`;
+      workbook.SheetNames.forEach(sheetName => {
+        const sheet = workbook.Sheets[sheetName];
+        const csv = window.XLSX.utils.sheet_to_csv(sheet);
+        if (csv.trim()) text += `\nSheet: ${sheetName}\n${csv.substring(0, 3000)}`;
+      });
+      return text;
+    }
+
+    if (['ppt', 'pptx'].includes(ext)) {
+      // PPT/PPTX — extract via zip reading of XML content
+      if (!window.JSZip) {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+      }
+      const arrayBuffer = await file.arrayBuffer();
+      try {
+        const zip = await window.JSZip.loadAsync(arrayBuffer);
+        let text = `[PowerPoint: ${file.name}]\n`;
+        const slideFiles = Object.keys(zip.files).filter(f => f.match(/ppt\/slides\/slide[0-9]+\.xml$/));
+        slideFiles.sort();
+        for (let i = 0; i < Math.min(slideFiles.length, 50); i++) {
+          const xmlContent = await zip.files[slideFiles[i]].async('string');
+          const stripped = xmlContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          if (stripped.length > 20) text += `\nSlide ${i+1}: ${stripped.substring(0, 500)}`;
+        }
+        return text;
+      } catch(e) {
+        return `[PowerPoint: ${file.name} — could not parse slides: ${e.message}]`;
+      }
+    }
+
+    return `[File: ${file.name} — office format, text extraction attempted]`;
+  } catch(e) {
+    return `[File: ${file.name} — extraction error: ${e.message}]`;
+  }
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function fetchURLContent(url) {
+  try {
+    // Use a CORS proxy to fetch URL content
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (!data.contents) throw new Error('No content returned');
+    // Strip HTML tags and clean up
+    const text = data.contents
+      .replace(/<script[^>]*>.*?<\/script>/gis, '')
+      .replace(/<style[^>]*>.*?<\/style>/gis, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return `[URL: ${url}]\n${text}`;
+  } catch(e) {
+    return `[URL: ${url} — could not fetch content: ${e.message}]`;
+  }
+}
+
+async function collectDocumentContext(moduleId) {
+  const contextParts = [];
+
+  // Fetch URL contents
+  const urls = [];
+  for (let n = 1; n <= 5; n++) {
+    const el = document.getElementById(`url-${moduleId}-${n}`);
+    if (el && el.value.trim()) urls.push(el.value.trim());
+  }
+
+  if (urls.length > 0) {
+    const loadingEl = document.getElementById(`loading-${moduleId}`);
+    if (loadingEl) {
+      const sub = loadingEl.querySelector('.loading-sub');
+      if (sub) sub.textContent = `Reading ${urls.length} URL${urls.length>1?'s':''}…`;
+    }
+    const urlResults = await Promise.all(urls.map(url => fetchURLContent(url)));
+    urlResults.forEach(r => { if (r) contextParts.push(r); });
+  }
+
+  // Extract file contents
+  const files = moduleFiles[moduleId] || [];
+  if (files.length > 0) {
+    const loadingEl = document.getElementById(`loading-${moduleId}`);
+    if (loadingEl) {
+      const sub = loadingEl.querySelector('.loading-sub');
+      if (sub) sub.textContent = `Extracting text from ${files.length} file${files.length>1?'s':''}…`;
+    }
+    for (const file of files) {
+      const text = await extractFileContent(file);
+      if (text) contextParts.push(text);
+    }
+  }
+
+  return contextParts.join('\n\n---\n\n');
 }
 
 function updateProjectCompletion() {
@@ -2026,7 +2251,7 @@ function buildPriorIntelligence(moduleId) {
   return priorOutputs;
 }
 
-function buildPrompt(moduleId, answers) {
+function buildPrompt(moduleId, answers, documentContext) {
   const mod = MODULES.find(m => m.id === moduleId);
   const project = getProject(currentProjectId);
   const priorIntel = buildPriorIntelligence(moduleId);
@@ -2061,6 +2286,17 @@ function buildPrompt(moduleId, answers) {
     priorIntelSection = `\nNOTE: This is the first module. Be thorough — your findings here become the strategic foundation for all downstream analysis.\n`;
   }
 
+  // Document context section
+  const docSection = documentContext && documentContext.trim()
+    ? `
+SUPPORTING DOCUMENTS & URLS (Read and cite specific data from these in your analysis):
+${documentContext.substring(0, 40000)}${documentContext.length > 40000 ? '
+[Additional content truncated for length]' : ''}
+
+CRITICAL INSTRUCTION: The above documents and URLs contain real proprietary data from the Show Director. You MUST read, reference, and cite specific facts, figures, and insights from these documents throughout your analysis. Do not ignore them. When you use data from a document, note the source (e.g., "Per the RFID Pacing Report..." or "According to the media plan...").`
+    : '
+NOTE: No supporting documents or URLs were provided for this module.';
+
   return `You are a senior strategic planning advisor specializing in trade shows, B2B conferences, and the events industry. You are helping a Show Director at Emerald Expositions — one of the largest B2B event producers in North America — build their annual Business Operational Plan (BOP) for the 2026–2027 season.
 
 SHOW CONTEXT:
@@ -2069,6 +2305,7 @@ SHOW CONTEXT:
 - Planning Season: ${project.season}
 - Prior Modules Completed: ${priorIntel.length > 0 ? priorIntel.map(p=>`Module ${p.number} (${p.name})`).join(', ') : 'None — this is the first module'}
 ${priorIntelSection}
+${docSection}
 MODULE BEING ANALYZED: ${mod.number} — ${mod.name}
 PURPOSE: ${mod.desc}
 ${anchorText}
@@ -2120,7 +2357,13 @@ async function analyzeModule(moduleId) {
   if (outputCard) outputCard.classList.remove('visible');
 
   try {
-    const prompt = buildPrompt(moduleId, answers);
+    // Read all files and URLs first
+    const loadingSub = loading.querySelector('.loading-sub');
+    if (loadingSub) loadingSub.textContent = 'Reading uploaded documents and URLs…';
+    const documentContext = await collectDocumentContext(moduleId);
+    if (loadingSub) loadingSub.textContent = `Building BOP output for Module ${moduleId}…`;
+
+    const prompt = buildPrompt(moduleId, answers, documentContext);
     const text = await callClaude(prompt);
     displayOutput(moduleId, text);
   } catch (err) {
@@ -2198,14 +2441,516 @@ Make it specific, insightful, and immediately useful as a BOP planning document 
 }
 
 function copyOutput(moduleId) {
-  const content = document.getElementById(`output-content-${moduleId}`);
-  if (content) {
-    const text = content.innerText || content.textContent;
+  const el = document.getElementById(`output-content-${moduleId}`);
+  if (el) {
+    const text = el.innerText || el.textContent;
     navigator.clipboard.writeText(text).then(() => {
-      const btn = document.querySelector(`#output-card-${moduleId} .btn-copy`);
-      if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1500); }
+      const btn = document.getElementById(`copy-btn-${moduleId}`);
+      if (btn) { btn.textContent = '✓ Copied!'; setTimeout(() => btn.textContent = '📋 Copy Text', 1500); }
     });
   }
+}
+
+// ============================================================
+// EXPORT FUNCTIONS
+// ============================================================
+
+function getOutputText(moduleId) {
+  const el = document.getElementById(`output-content-${moduleId}`);
+  return el ? (el.innerText || el.textContent || '').trim() : '';
+}
+
+function getModuleInfo(moduleId) {
+  const mod = MODULES.find(m => m.id === moduleId);
+  const project = getProject(currentProjectId);
+  return { mod, project };
+}
+
+// ── WORD EXPORT ──────────────────────────────────────────────
+function exportWord(moduleId) {
+  const text = getOutputText(moduleId);
+  if (!text) { alert('No output to export. Please run the analysis first.'); return; }
+
+  const { mod, project } = getModuleInfo(moduleId);
+  const title = `Module ${mod.number}: ${mod.name}`;
+  const showName = project.name;
+  const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  // Build RTF content (universally opens in Word)
+  const lines = text.split('\n');
+  let rtfBody = '';
+
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (!trimmed) { rtfBody += '\par\par '; return; }
+
+    if (trimmed.startsWith('## ')) {
+      // H2 heading
+      const heading = trimmed.replace('## ', '');
+      rtfBody += `\par\pard\sb240\sa120\b\fs28 ${escapeRTF(heading)}\b0\fs22\par `;
+    } else if (trimmed.startsWith('### ')) {
+      // H3 heading
+      const heading = trimmed.replace('### ', '');
+      rtfBody += `\par\pard\sb180\sa80\b\fs22 ${escapeRTF(heading)}\b0\par `;
+    } else if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
+      rtfBody += `\par\pard\b ${escapeRTF(trimmed.replace(/\*\*/g,''))}\b0\par `;
+    } else if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
+      const bullet = trimmed.replace(/^[-•] /, '');
+      rtfBody += `\par\pard\li360\fi-180\bullet  ${escapeRTF(bullet)}\par `;
+    } else {
+      // Parse inline bold
+      const parsed = escapeRTF(trimmed).replace(/\*\*(.+?)\*\*/g, '\\b $1\\b0 ');
+      rtfBody += `\par\pard ${parsed}`;
+    }
+  });
+
+  const rtf = `{\rtf1\ansi\deff0
+{\fonttbl{\f0\froman\fcharset0 Georgia;}{\f1\fswiss\fcharset0 Calibri;}}
+{\colortbl;\red2\green81\blue87;\red145\green213\blue0;\red0\green0\blue0;}
+\paperw12240\paperh15840\margl1440\margr1440\margt1440\margb1440
+\f1\fs22\cf3
+
+{\pard\sb0\sa120\cf1\f0\fs36\b ${escapeRTF(showName)} — BOP ${project.season}\b0\par}
+{\pard\sb0\sa80\cf1\f0\fs28 ${escapeRTF(title)}\par}
+{\pard\sb0\sa200\f1\fs18\cf3 Prepared by Emerald Interrogator · ${escapeRTF(date)}\par}
+{\pard\sb0\sa200\brdrb\brdrs\brdrw10\brdrsp20 \par}
+
+${rtfBody}
+
+}`;
+
+  const blob = new Blob([rtf], { type: 'application/rtf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${showName.replace(/[^a-z0-9]/gi,'_')}_Module${mod.number}_${mod.name.replace(/[^a-z0-9]/gi,'_')}.rtf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function escapeRTF(str) {
+  return (str || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/{/g, '\\{')
+    .replace(/}/g, '\\}')
+    .replace(/[\u0080-\uFFFF]/g, c => `\\u${c.charCodeAt(0)}?`);
+}
+
+// ── POWERPOINT EXPORT ─────────────────────────────────────────
+function exportPPT(moduleId) {
+  const text = getOutputText(moduleId);
+  if (!text) { alert('No output to export. Please run the analysis first.'); return; }
+
+  const { mod, project } = getModuleInfo(moduleId);
+  const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  // Parse output into sections
+  const sections = parseSections(text);
+
+  // Build PPTX XML (Open XML format)
+  const slides = buildPPTSlides(sections, mod, project, date);
+  const pptxBlob = createPPTX(slides, mod, project);
+
+  const url = URL.createObjectURL(pptxBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${project.name.replace(/[^a-z0-9]/gi,'_')}_Module${mod.number}_${mod.name.replace(/[^a-z0-9]/gi,'_')}.pptx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function parseSections(text) {
+  const sections = [];
+  let currentSection = null;
+  const lines = text.split('\n');
+
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('## ')) {
+      if (currentSection) sections.push(currentSection);
+      currentSection = { title: trimmed.replace('## ', ''), bullets: [] };
+    } else if (currentSection && trimmed && !trimmed.startsWith('###')) {
+      const clean = trimmed.replace(/^[-•] /, '').replace(/\*\*/g, '');
+      if (clean.length > 10) currentSection.bullets.push(clean);
+    }
+  });
+  if (currentSection) sections.push(currentSection);
+  return sections;
+}
+
+function xmlEsc(str) {
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+
+function buildPPTSlides(sections, mod, project, date) {
+  const slides = [];
+
+  // Title slide
+  slides.push({
+    type: 'title',
+    title: `${project.name}`,
+    subtitle: `Module ${mod.number}: ${mod.name}`,
+    meta: `BOP ${project.season} · ${date}`
+  });
+
+  // One slide per section — split bullets across slides if needed
+  sections.forEach(section => {
+    const maxBulletsPerSlide = 6;
+    const chunks = [];
+    for (let i = 0; i < section.bullets.length; i += maxBulletsPerSlide) {
+      chunks.push(section.bullets.slice(i, i + maxBulletsPerSlide));
+    }
+    if (chunks.length === 0) chunks.push([]);
+
+    chunks.forEach((chunk, ci) => {
+      slides.push({
+        type: 'content',
+        title: section.title + (chunks.length > 1 ? ` (${ci+1}/${chunks.length})` : ''),
+        bullets: chunk
+      });
+    });
+  });
+
+  // Closing slide
+  slides.push({
+    type: 'closing',
+    title: `${project.name}`,
+    subtitle: `Module ${mod.number} Complete`,
+    meta: `Emerald Interrogator · BOP Intelligence Platform`
+  });
+
+  return slides;
+}
+
+function createPPTX(slides, mod, project) {
+  // Build minimal PPTX using Open XML
+  // Colors: Dark Aqua #025157, Green #91D500
+  const slideXMLs = slides.map((slide, idx) => buildSlideXML(slide, idx));
+  const slideRels = slides.map((_, idx) => buildSlideRel(idx));
+  const presentationXML = buildPresentationXML(slides.length);
+
+  // Simple zip builder for PPTX
+  const files = {
+    '[Content_Types].xml': buildContentTypes(slides.length),
+    '_rels/.rels': buildRootRels(),
+    'ppt/presentation.xml': presentationXML,
+    'ppt/_rels/presentation.xml.rels': buildPresentationRels(slides.length),
+    'ppt/slideMasters/slideMaster1.xml': buildSlideMaster(),
+    'ppt/slideMasters/_rels/slideMaster1.xml.rels': buildSlideMasterRels(slides.length),
+    'ppt/slideLayouts/slideLayout1.xml': buildSlideLayout(),
+    'ppt/slideLayouts/_rels/slideLayout1.xml.rels': buildSlideLayoutRels(),
+    'ppt/theme/theme1.xml': buildTheme(),
+    'docProps/app.xml': buildAppProps(project.name),
+    'docProps/core.xml': buildCoreProps(project.name),
+  };
+
+  slides.forEach((_, idx) => {
+    files[`ppt/slides/slide${idx+1}.xml`] = slideXMLs[idx];
+    files[`ppt/slides/_rels/slide${idx+1}.xml.rels`] = slideRels[idx];
+  });
+
+  return zipFiles(files);
+}
+
+function buildSlideXML(slide, idx) {
+  const BG = slide.type === 'title' || slide.type === 'closing' ? '025157' : 'F0F4F5';
+  const titleColor = slide.type === 'title' || slide.type === 'closing' ? 'FFFFFF' : '025157';
+  const accentColor = '91D500';
+
+  if (slide.type === 'title' || slide.type === 'closing') {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="${BG}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>
+  <p:spTree>
+    <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+    <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="5143500"/></a:xfrm></p:grpSpPr>
+    <p:sp><p:nvSpPr><p:cNvPr id="2" name="title"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr/></p:nvSpPr>
+      <p:spPr><a:xfrm><a:off x="457200" y="1371600"/><a:ext cx="8229600" cy="1143000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+      <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US" sz="3600" b="1" dirty="0"><a:solidFill><a:srgbClr val="${titleColor}"/></a:solidFill><a:latin typeface="Georgia"/></a:rPr><a:t>${xmlEsc(slide.title)}</a:t></a:r></a:p></p:txBody>
+    </p:sp>
+    <p:sp><p:nvSpPr><p:cNvPr id="3" name="subtitle"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+      <p:spPr><a:xfrm><a:off x="457200" y="2628000"/><a:ext cx="8229600" cy="685800"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+      <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US" sz="2400" dirty="0"><a:solidFill><a:srgbClr val="${accentColor}"/></a:solidFill><a:latin typeface="Georgia" pitchFamily="18" charset="0"/></a:rPr><a:t>${xmlEsc(slide.subtitle||'')}</a:t></a:r></a:p></p:txBody>
+    </p:sp>
+    <p:sp><p:nvSpPr><p:cNvPr id="4" name="meta"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+      <p:spPr><a:xfrm><a:off x="457200" y="3428000"/><a:ext cx="8229600" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+      <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US" sz="1400" dirty="0"><a:solidFill><a:srgbClr val="AACCCC"/></a:solidFill><a:latin typeface="Calibri"/></a:rPr><a:t>${xmlEsc(slide.meta||'')}</a:t></a:r></a:p></p:txBody>
+    </p:sp>
+    <p:sp><p:nvSpPr><p:cNvPr id="5" name="accent"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+      <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="137160" cy="5143500"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="${accentColor}"/></a:solidFill></p:spPr>
+      <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
+    </p:sp>
+  </p:spTree></p:cSld>
+</p:sld>`;
+  }
+
+  // Content slide
+  const bulletItems = (slide.bullets||[]).map(b =>
+    `<a:p><a:pPr marL="342900" indent="-342900"><a:buChar char="●"/></a:pPr><a:r><a:rPr lang="en-US" sz="1600" dirty="0"><a:solidFill><a:srgbClr val="5F6673"/></a:solidFill><a:latin typeface="Calibri"/></a:rPr><a:t>${xmlEsc(b.substring(0,200))}</a:t></a:r></a:p>`
+  ).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="${BG}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>
+  <p:spTree>
+    <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+    <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="5143500"/></a:xfrm></p:grpSpPr>
+    <p:sp><p:nvSpPr><p:cNvPr id="2" name="hdr"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+      <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="685800"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="025157"/></a:solidFill></p:spPr>
+      <p:txBody><a:bodyPr anchor="ctr"/><a:lstStyle/><a:p><a:pPr algn="l" marL="457200"><a:spcBef><a:spcPts val="0"/></a:spcBef></a:pPr><a:r><a:rPr lang="en-US" sz="1800" b="1" dirty="0"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:latin typeface="Georgia"/></a:rPr><a:t>${xmlEsc(slide.title)}</a:t></a:r></a:p></p:txBody>
+    </p:sp>
+    <p:sp><p:nvSpPr><p:cNvPr id="3" name="accent"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+      <p:spPr><a:xfrm><a:off x="0" y="685800"/><a:ext cx="9144000" cy="45720"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="${accentColor}"/></a:solidFill></p:spPr>
+      <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
+    </p:sp>
+    <p:sp><p:nvSpPr><p:cNvPr id="4" name="content"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+      <p:spPr><a:xfrm><a:off x="457200" y="800000"/><a:ext cx="8229600" cy="4200000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+      <p:txBody><a:bodyPr/><a:lstStyle/>${bulletItems||'<a:p/>'}
+      </p:txBody>
+    </p:sp>
+  </p:spTree></p:cSld>
+</p:sld>`;
+}
+
+function buildSlideRel(idx) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+</Relationships>`;
+}
+
+function buildContentTypes(slideCount) {
+  const slideTypes = Array.from({length: slideCount}, (_,i) =>
+    `<Override PartName="/ppt/slides/slide${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`
+  ).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+  <Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
+  <Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
+  <Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+  ${slideTypes}
+</Types>`;
+}
+
+function buildRootRels() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>`;
+}
+
+function buildPresentationXML(slideCount) {
+  const sldIdLst = Array.from({length: slideCount}, (_,i) =>
+    `<p:sldId id="${256+i}" r:id="rId${i+1}"/>`
+  ).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId${slideCount+1}"/></p:sldMasterIdLst>
+  <p:sldIdLst>${sldIdLst}</p:sldIdLst>
+  <p:sldSz cx="9144000" cy="5143500" type="screen16x9"/>
+  <p:notesSz cx="6858000" cy="9144000"/>
+</p:presentation>`;
+}
+
+function buildPresentationRels(slideCount) {
+  const slideRels = Array.from({length: slideCount}, (_,i) =>
+    `<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i+1}.xml"/>`
+  ).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  ${slideRels}
+  <Relationship Id="rId${slideCount+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>
+  <Relationship Id="rId${slideCount+2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>
+</Relationships>`;
+}
+
+function buildSlideMaster() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="5143500"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld>
+  <p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>
+  <p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst>
+  <p:txStyles><p:titleStyle><a:lvl1pPr><a:defRPr/></a:lvl1pPr></p:titleStyle><p:bodyStyle><a:lvl1pPr><a:defRPr/></a:lvl1pPr></p:bodyStyle><p:otherStyle><a:lvl1pPr><a:defRPr/></a:lvl1pPr></p:otherStyle></p:txStyles>
+</p:sldMaster>`;
+}
+
+function buildSlideMasterRels(slideCount) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>
+</Relationships>`;
+}
+
+function buildSlideLayout() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" type="blank">
+  <p:cSld name="Blank"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9144000" cy="5143500"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld>
+</p:sldLayout>`;
+}
+
+function buildSlideLayoutRels() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>
+</Relationships>`;
+}
+
+function buildTheme() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Emerald">
+  <a:themeElements>
+    <a:clrScheme name="Emerald">
+      <a:dk1><a:srgbClr val="025157"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>
+      <a:dk2><a:srgbClr val="008098"/></a:dk2><a:lt2><a:srgbClr val="EDF1F4"/></a:lt2>
+      <a:accent1><a:srgbClr val="91D500"/></a:accent1><a:accent2><a:srgbClr val="FF671D"/></a:accent2>
+      <a:accent3><a:srgbClr val="FFBF3F"/></a:accent3><a:accent4><a:srgbClr val="D5DFE3"/></a:accent4>
+      <a:accent5><a:srgbClr val="025157"/></a:accent5><a:accent6><a:srgbClr val="008098"/></a:accent6>
+      <a:hlink><a:srgbClr val="008098"/></a:hlink><a:folHlink><a:srgbClr val="025157"/></a:folHlink>
+    </a:clrScheme>
+    <a:fontScheme name="Emerald"><a:majorFont><a:latin typeface="Georgia"/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/></a:minorFont></a:fontScheme>
+    <a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme>
+  </a:themeElements>
+</a:theme>`;
+}
+
+function buildAppProps(showName) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">
+  <Application>Emerald Interrogator</Application><Company>Emerald Expositions</Company>
+</Properties>`;
+}
+
+function buildCoreProps(showName) {
+  const now = new Date().toISOString();
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+  xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/">
+  <dc:title>${xmlEsc(showName)} BOP Intelligence</dc:title>
+  <dc:creator>Emerald Interrogator</dc:creator>
+  <dcterms:created xsi:type="dcterms:W3CDTF" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${now}</dcterms:created>
+</cp:coreProperties>`;
+}
+
+// Simple in-browser zip builder
+function zipFiles(files) {
+  // Build a minimal ZIP file manually
+  const encoder = new TextEncoder();
+  const entries = [];
+  let offset = 0;
+
+  for (const [name, content] of Object.entries(files)) {
+    const nameBytes = encoder.encode(name);
+    const contentBytes = encoder.encode(content);
+    const header = buildLocalFileHeader(nameBytes, contentBytes);
+    entries.push({ nameBytes, contentBytes, header, offset });
+    offset += header.length + contentBytes.length;
+  }
+
+  const centralDir = entries.map(e => buildCentralDirEntry(e.nameBytes, e.contentBytes, e.offset)).flat();
+  const centralDirSize = centralDir.reduce((s,b) => s + b.length, 0);
+  const eocd = buildEOCD(entries.length, centralDirSize, offset);
+
+  const parts = [];
+  entries.forEach(e => { parts.push(e.header); parts.push(e.contentBytes); });
+  centralDir.forEach(b => parts.push(b));
+  parts.push(eocd);
+
+  const totalSize = parts.reduce((s,p) => s + p.length, 0);
+  const result = new Uint8Array(totalSize);
+  let pos = 0;
+  parts.forEach(p => { result.set(p, pos); pos += p.length; });
+
+  return new Blob([result], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+}
+
+function u16(n) { return new Uint8Array([n&0xff, (n>>8)&0xff]); }
+function u32(n) { return new Uint8Array([n&0xff,(n>>8)&0xff,(n>>16)&0xff,(n>>24)&0xff]); }
+
+function crc32(data) {
+  let crc = 0xFFFFFFFF;
+  const table = crc32.table || (crc32.table = buildCRC32Table());
+  for (let i = 0; i < data.length; i++) crc = (crc>>>8) ^ table[(crc^data[i])&0xFF];
+  return (crc^0xFFFFFFFF)>>>0;
+}
+
+function buildCRC32Table() {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1;
+    t[i] = c;
+  }
+  return t;
+}
+
+function buildLocalFileHeader(nameBytes, contentBytes) {
+  const crc = crc32(contentBytes);
+  const parts = [
+    new Uint8Array([0x50,0x4B,0x03,0x04]), // signature
+    u16(20), u16(0), u16(0),               // version, flags, compression
+    u16(0), u16(0),                         // mod time, mod date
+    u32(crc), u32(contentBytes.length), u32(contentBytes.length),
+    u16(nameBytes.length), u16(0),          // name length, extra length
+    nameBytes
+  ];
+  const size = parts.reduce((s,p) => s+p.length, 0);
+  const out = new Uint8Array(size);
+  let pos = 0;
+  parts.forEach(p => { out.set(p,pos); pos+=p.length; });
+  return out;
+}
+
+function buildCentralDirEntry(nameBytes, contentBytes, offset) {
+  const crc = crc32(contentBytes);
+  const parts = [
+    new Uint8Array([0x50,0x4B,0x01,0x02]),
+    u16(20), u16(20), u16(0), u16(0),
+    u16(0), u16(0),
+    u32(crc), u32(contentBytes.length), u32(contentBytes.length),
+    u16(nameBytes.length), u16(0), u16(0), u16(0), u16(0),
+    u32(0), u32(offset),
+    nameBytes
+  ];
+  const size = parts.reduce((s,p)=>s+p.length,0);
+  const out = new Uint8Array(size);
+  let pos = 0;
+  parts.forEach(p=>{out.set(p,pos);pos+=p.length;});
+  return [out];
+}
+
+function buildEOCD(count, size, offset) {
+  const parts = [
+    new Uint8Array([0x50,0x4B,0x05,0x06]),
+    u16(0),u16(0),u16(count),u16(count),
+    u32(size),u32(offset),u16(0)
+  ];
+  const total = parts.reduce((s,p)=>s+p.length,0);
+  const out = new Uint8Array(total);
+  let pos=0;
+  parts.forEach(p=>{out.set(p,pos);pos+=p.length;});
+  return out;
 }
 
 function markComplete(moduleId) {
