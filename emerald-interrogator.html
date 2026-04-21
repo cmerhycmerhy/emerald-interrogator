@@ -16,6 +16,7 @@
   }
 })();
 </script>
+<script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -2056,8 +2057,8 @@ async function extractPDF(file) {
   try {
     // Load pdf.js dynamically
     if (!window.pdfjsLib) {
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      await loadScript('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js');
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
     }
 
     const arrayBuffer = await file.arrayBuffer();
@@ -2087,7 +2088,7 @@ async function extractOffice(file) {
 
     if (['doc', 'docx'].includes(ext)) {
       if (!window.mammoth) {
-        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+        await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');
       }
       const arrayBuffer = await file.arrayBuffer();
       const result = await window.mammoth.extractRawText({ arrayBuffer });
@@ -2096,7 +2097,7 @@ async function extractOffice(file) {
 
     if (['xls', 'xlsx'].includes(ext)) {
       if (!window.XLSX) {
-        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+        await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
       }
       const arrayBuffer = await file.arrayBuffer();
       const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
@@ -2112,7 +2113,7 @@ async function extractOffice(file) {
     if (['ppt', 'pptx'].includes(ext)) {
       // PPT/PPTX — extract via zip reading of XML content
       if (!window.JSZip) {
-        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+        await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
       }
       const arrayBuffer = await file.arrayBuffer();
       try {
@@ -2579,13 +2580,13 @@ function exportPPT(moduleId) {
   var date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
   // Load PptxGenJS from CDN then generate
-  if (window.PptxGenJS) {
+  if (window.PptxGenJS || window.pptxgen) {
     generatePPTX(text, mod, project, date);
   } else {
     var btn = document.querySelector('#output-card-' + moduleId + ' .btn-export.ppt');
     if (btn) btn.textContent = '⏳ Loading…';
     var script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js';
+    script.src = 'https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
     script.onload = function() {
       if (btn) btn.textContent = '📊 PowerPoint (.pptx)';
       generatePPTX(text, mod, project, date);
@@ -2616,7 +2617,8 @@ function parseSections(text) {
 }
 
 function generatePPTX(text, mod, project, date) {
-  var pptx = new window.PptxGenJS();
+  var PptxClass = window.PptxGenJS || window.pptxgen;
+  var pptx = new PptxClass();
   pptx.layout = 'LAYOUT_16x9';
   pptx.title = project.name + ' — Module ' + mod.number + ': ' + mod.name;
 
