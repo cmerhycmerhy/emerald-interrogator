@@ -2456,7 +2456,13 @@ function copyOutput(moduleId) {
 // ============================================================
 
 function getOutputText(moduleId) {
-  const el = document.getElementById('output-content-' + moduleId);
+  // Read from raw stored output so ## headers are preserved for PPT/Word parsing
+  var project = getProject(currentProjectId);
+  if (project && project.outputs && project.outputs[moduleId]) {
+    return project.outputs[moduleId];
+  }
+  // Fallback to DOM text
+  var el = document.getElementById('output-content-' + moduleId);
   return el ? (el.innerText || el.textContent || '').trim() : '';
 }
 
@@ -2602,7 +2608,9 @@ function exportPPT(moduleId) {
 function parseSections(text) {
   var sections = [];
   var current = null;
-  text.split('\n').forEach(function(line) {
+  // Handle both real newlines and escaped newlines
+  var normalized = text.replace(/\\n/g, '\n');
+  normalized.split('\n').forEach(function(line) {
     var t = line.trim();
     if (t.indexOf('## ') === 0) {
       if (current) sections.push(current);
