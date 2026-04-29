@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
 <title>Emerald Interrogator — BOP Intelligence Platform</title>
+<input type="file" id="import-file-input" accept=".json" style="display:none" onchange="handleImportFile(event)">
 <script>
 (function() {
   try {
@@ -246,6 +247,34 @@
     margin-bottom: 36px;
     line-height: 1.65;
   }
+
+  .btn-save-load {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent;
+    border: 1.5px solid rgba(145,213,0,0.4);
+    color: var(--em-green);
+    font-family: var(--font-body);
+    font-size: 12px; font-weight: 800;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .btn-save-load:hover { background: rgba(145,213,0,0.1); border-color: var(--em-green); }
+  .btn-import { border-color: rgba(0,128,152,0.4); color: var(--em-aqua); }
+  .btn-import:hover { background: rgba(0,128,152,0.1); border-color: var(--em-aqua); }
+  .import-toast {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+    background: var(--em-dark-aqua); color: #fff;
+    padding: 12px 28px; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 700; font-family: var(--font-body);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+    z-index: 9999; opacity: 0; transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .import-toast.visible { opacity: 1; }
 
   .btn-create {
     display: inline-flex;
@@ -1347,10 +1376,16 @@
       <div class="hero-eyebrow">BOP 2026–2027 Season</div>
       <h1 class="hero-title">Your Show<br><em>Intelligence</em> Hub</h1>
       <p class="hero-desc">AI-powered strategic planning for every event in the Emerald portfolio. Build your Business Operational Plan with structured intelligence — module by module.</p>
-      <button class="btn-create" onclick="openCreateModal()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Create New Show Plan
-      </button>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn-create" onclick="openCreateModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Create New Show Plan
+        </button>
+        <button class="btn-save-load btn-import" onclick="importProject()" title="Load a previously saved .json project file">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Load Project
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1773,6 +1808,12 @@ function renderDashboard() {
           </div>
         </div>
         <div class="module-list">${moduleItems}</div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+          <button class="btn-save-load" onclick="event.stopPropagation();exportProject('${p.id}')" title="Save project to file">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Save to File
+          </button>
+        </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
       </div>`;
   }).join('');
@@ -2874,6 +2915,115 @@ function markComplete(moduleId) {
   renderModuleNav();
   const btn = document.querySelector('#output-card-' + moduleId + ' .btn-mark-complete');
   if (btn) btn.textContent = project.completed[moduleId] ? '✓ Complete' : 'Mark Complete';
+}
+
+
+// ============================================================
+// PROJECT EXPORT / IMPORT (Save & Load JSON)
+// ============================================================
+
+function exportProject(projectId) {
+  var project = getProject(projectId);
+  if (!project) { alert('Project not found.'); return; }
+
+  var exportData = {
+    version: '1.0',
+    exportDate: new Date().toISOString(),
+    exportedBy: 'Emerald Interrogator BOP Platform',
+    project: JSON.parse(JSON.stringify(project)) // deep copy
+  };
+
+  var json = JSON.stringify(exportData, null, 2);
+  var blob = new Blob([json], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+
+  // Clean filename from show name
+  var safeName = (project.name || 'show').replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_');
+  var dateStr = new Date().toISOString().slice(0,10);
+  a.download = 'EmeraldInterrogator_' + safeName + '_' + dateStr + '.json';
+
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast('Project saved to file: ' + a.download);
+}
+
+function importProject() {
+  var input = document.getElementById('import-file-input');
+  input.value = ''; // reset so same file can be re-loaded
+  input.click();
+}
+
+function handleImportFile(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+
+      // Validate structure
+      if (!data.project || !data.project.id || !data.project.name) {
+        alert('Invalid project file. Please use a file saved from the Emerald Interrogator.');
+        return;
+      }
+
+      var incomingProject = data.project;
+
+      // Check if project already exists
+      var projects = getProjects();
+      var existingIdx = projects.findIndex(function(p) { return p.id === incomingProject.id; });
+
+      if (existingIdx >= 0) {
+        // Ask user whether to overwrite or create new
+        var choice = confirm(
+   confirm('A project called "' + incomingProject.name + '" already exists.\n\nOK = overwrite it.\nCancel = import as a new separate project.'););
+        if (choice) {
+          // Overwrite
+          projects[existingIdx] = incomingProject;
+        } else {
+          // Create new with new ID
+          incomingProject.id = 'proj_' + Date.now();
+          incomingProject.name = incomingProject.name + ' (Imported)';
+          projects.push(incomingProject);
+        }
+      } else {
+        // New project — just add it
+        projects.push(incomingProject);
+      }
+
+      saveProjectsRaw(projects);
+      renderDashboard();
+
+      var moduleCount = Object.keys(incomingProject.answers || {}).length;
+      var outputCount = Object.keys(incomingProject.outputs || {}).length;
+      showToast(
+        'Project loaded: ' + incomingProject.name +
+        ' · ' + moduleCount + ' module answers · ' + outputCount + ' AI outputs restored'
+      );
+
+    } catch(err) {
+      alert('Could not read project file: ' + err.message + '\n\nMake sure this is a valid Emerald Interrogator .json file.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function saveProjectsRaw(projects) {
+  localStorage.setItem('ei_projects', JSON.stringify(projects));
+}
+
+function showToast(message) {
+  var toast = document.getElementById('import-toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('visible');
+  setTimeout(function() { toast.classList.remove('visible'); }, 4000);
 }
 
 // ============================================================
