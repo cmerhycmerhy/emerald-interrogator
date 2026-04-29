@@ -6,17 +6,6 @@
 <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
 <title>Emerald Interrogator — BOP Intelligence Platform</title>
 <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="handleImportFile(event)">
-<script>
-(function() {
-  try {
-    if (window.self !== window.top) { window.top.location.href = window.self.location.href; }
-  } catch(e) {
-    document.addEventListener('DOMContentLoaded', function() {
-      document.body.innerHTML = '<div style="font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#025157;color:#fff;text-align:center;gap:20px;padding:40px"><h2>Open Emerald Interrogator</h2><a href="' + window.location.href + '" target="_blank" style="background:#91D500;color:#025157;font-weight:700;font-size:16px;padding:14px 32px;border-radius:6px;text-decoration:none">Open Full Screen →</a></div>';
-    });
-  }
-})();
-</script>
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <style>
@@ -2514,12 +2503,13 @@ function getModuleInfo(moduleId) {
 }
 
 function xmlEsc(str) {
-  return (str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+  var s = (str || '');
+  s = s.replace(/&/g, '&amp;');
+  s = s.replace(/</g, '&lt;');
+  s = s.replace(/>/g, '&gt;');
+  s = s.replace(/"/g, '&quot;');
+  s = s.replace(/'/g, '&apos;');
+  return s;
 }
 
 // ── WORD EXPORT ──────────────────────────────────────────────
@@ -2981,19 +2971,18 @@ function handleImportFile(event) {
 
       if (existingIdx >= 0) {
         // Ask user whether to overwrite or create new
-        var choice = confirm(
-   confirm('A project called "' + incomingProject.name + '" already exists.\n\nOK = overwrite it.\nCancel = import as a new separate project.'););
+        var choice = confirm('A project called "' + incomingProject.name + '" already exists.\n\nOK = overwrite it.\nCancel = import as a new separate project.');
         if (choice) {
-          // Overwrite
+          // Overwrite existing
           projects[existingIdx] = incomingProject;
         } else {
-          // Create new with new ID
+          // Import as new copy with new ID
           incomingProject.id = 'proj_' + Date.now();
           incomingProject.name = incomingProject.name + ' (Imported)';
           projects.push(incomingProject);
         }
       } else {
-        // New project — just add it
+        // Brand new project
         projects.push(incomingProject);
       }
 
@@ -3008,7 +2997,7 @@ function handleImportFile(event) {
       );
 
     } catch(err) {
-      alert('Could not read project file: ' + err.message + '\n\nMake sure this is a valid Emerald Interrogator .json file.');
+      alert('Could not read project file. Make sure this is a valid Emerald Interrogator .json file.');
     }
   };
   reader.readAsText(file);
@@ -3026,31 +3015,35 @@ function showToast(message) {
   setTimeout(function() { toast.classList.remove('visible'); }, 4000);
 }
 
-// ============================================================
-// KEYBOARD & EVENTS
-// ============================================================
+function markComplete(moduleId) {
+  const project = getProject(currentProjectId);
+  if (!project.completed) project.completed = {};
+  project.completed[moduleId] = !project.completed[moduleId];
+  saveProjects();
+  updateProjectCompletion();
+  renderModuleNav();
+  const btn = document.querySelector('#output-card-' + moduleId + ' .btn-mark-complete');
+  if (btn) btn.textContent = project.completed[moduleId] ? '✓ Complete' : 'Mark Complete';
+}
 
-document.addEventListener('keydown', e => {
+// ============================================================
+// KEYBOARD
+// ============================================================
+document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
+    closeApiKeyModal();
     closeCreateModal();
-    if (_apiKey) closeApiKeyModal();
-  }
-  if (e.key === 'Enter') {
-    if (document.getElementById('modal-create').classList.contains('active')) createProject();
-    if (document.getElementById('modal-apikey').classList.contains('active')) submitApiKey();
   }
 });
-
-document.getElementById('modal-create').addEventListener('click', function(e) { if(e.target===this) closeCreateModal(); });
-document.getElementById('modal-apikey').addEventListener('click', function(e) { if(e.target===this && _apiKey) closeApiKeyModal(); });
 
 // ============================================================
 // INIT
 // ============================================================
-
 renderDashboard();
 
-if (ANTHROPIC_API_KEY && ANTHROPIC_API_KEY !== '') {
+const STORED_KEY = localStorage.getItem('ei_apikey');
+if (STORED_KEY && STORED_KEY !== '') {
+  API_KEY = STORED_KEY;
   updateApiStatus(true);
 } else {
   openApiKeyModal();
