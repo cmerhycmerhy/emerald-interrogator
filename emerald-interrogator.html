@@ -3006,29 +3006,29 @@ function handleImportFile(event) {
 
       var incomingProject = data.project;
 
-      // Check if project already exists
-      var projects = getProjects();
-      var existingIdx = projects.findIndex(function(p) { return p.id === incomingProject.id; });
+      // Check if project already exists — use allProjects to avoid shadowing global
+      var allProjects = getProjects().slice(); // shallow copy so we don't mutate yet
+      var existingIdx = allProjects.findIndex(function(p) { return p.id === incomingProject.id; });
 
       if (existingIdx >= 0) {
         // Ask user whether to overwrite or create new
         var choice = confirm('A project called "' + incomingProject.name + '" already exists.\n\nOK = overwrite it.\nCancel = import as a new separate project.');
         if (choice) {
           // Overwrite existing
-          projects[existingIdx] = incomingProject;
+          allProjects[existingIdx] = incomingProject;
         } else {
           // Import as new copy with new ID
           incomingProject.id = 'proj_' + Date.now();
           incomingProject.name = incomingProject.name + ' (Imported)';
-          projects.push(incomingProject);
+          allProjects.push(incomingProject);
         }
       } else {
         // Brand new project
-        projects.push(incomingProject);
+        allProjects.push(incomingProject);
       }
 
-      saveProjectsRaw(projects);
-      renderDashboard();
+      saveProjectsRaw(allProjects);  // updates global projects + localStorage
+      renderDashboard();             // now reads updated global projects
 
       var moduleCount = Object.keys(incomingProject.answers || {}).length;
       var outputCount = Object.keys(incomingProject.outputs || {}).length;
