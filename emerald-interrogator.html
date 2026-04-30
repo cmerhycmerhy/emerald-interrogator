@@ -3008,14 +3008,18 @@ function handleImportFile(event) {
       );
 
     } catch(err) {
-      alert('Could not read project file. Make sure this is a valid Emerald Interrogator .json file.');
+      console.error('Import error:', err);
+      alert('Could not read project file: ' + err.message + '\n\nMake sure this is a .json file saved from the Emerald Interrogator Save to File button.');
     }
   };
   reader.readAsText(file);
 }
 
-function saveProjectsRaw(projects) {
-  localStorage.setItem('ei_projects', JSON.stringify(projects));
+function saveProjectsRaw(updatedProjects) {
+  // Update in-memory array and persist to correct localStorage key
+  projects.length = 0;
+  updatedProjects.forEach(function(p) { projects.push(p); });
+  localStorage.setItem('emerald-projects', JSON.stringify(projects));
 }
 
 function showToast(message) {
