@@ -1761,6 +1761,34 @@ const MODULES = [
 // STATE
 // ============================================================
 
+// ── LOCALSTORAGE KEY MIGRATION ────────────────────────────────
+// Previous versions used different keys. Migrate all to 'emerald-projects'.
+(function migrateStorage() {
+  var oldKeys = ['ei_projects', 'emerald_projects', 'bop_projects', 'interrogator_projects'];
+  var existing = JSON.parse(localStorage.getItem('emerald-projects') || '[]');
+  var existingIds = existing.map(function(p) { return p.id; });
+  var migrated = 0;
+  oldKeys.forEach(function(key) {
+    try {
+      var old = JSON.parse(localStorage.getItem(key) || '[]');
+      if (old && old.length > 0) {
+        old.forEach(function(p) {
+          if (p && p.id && existingIds.indexOf(p.id) === -1) {
+            existing.push(p);
+            existingIds.push(p.id);
+            migrated++;
+          }
+        });
+        localStorage.removeItem(key); // clean up old key
+      }
+    } catch(e) { /* ignore parse errors on old keys */ }
+  });
+  if (migrated > 0) {
+    localStorage.setItem('emerald-projects', JSON.stringify(existing));
+    console.log('Migrated ' + migrated + ' project(s) from old storage keys');
+  }
+})();
+
 let projects = JSON.parse(localStorage.getItem('emerald-projects') || '[]');
 let currentProjectId = null;
 let currentModuleId = 1;
