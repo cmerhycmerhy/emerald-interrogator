@@ -1222,6 +1222,13 @@
 
   .btn-export:hover { border-color: var(--em-dark-aqua); color: var(--em-dark-aqua); background: #fff; }
   .btn-export.word:hover { border-color: #2B5797; color: #2B5797; }
+  .btn-export.bop-deck {
+    background: var(--em-dark-aqua);
+    border-color: var(--em-dark-aqua);
+    color: #fff;
+    font-weight: 900;
+  }
+  .btn-export.bop-deck:hover { background: #013a3e; border-color: #013a3e; color: #91D500; }
   .btn-export.ppt:hover { border-color: #D04423; color: #D04423; }
   .btn-export.copy-btn:hover { border-color: var(--em-aqua); color: var(--em-aqua); }
 
@@ -1325,6 +1332,8 @@
     <button class="btn-dashboard" onclick="showDashboard()">Dashboard</button>
   </nav>
 </header>
+
+<div class="import-toast" id="import-toast"></div>
 
 <!-- API KEY MODAL -->
 <div class="apikey-overlay" id="modal-apikey">
@@ -1758,6 +1767,7 @@ let currentModuleId = 1;
 
 function saveProjects() { localStorage.setItem('emerald-projects', JSON.stringify(projects)); }
 function getProject(id) { return projects.find(p => p.id === id); }
+function getProjects() { return projects; }
 function getCompletedCount(project) { return Object.values(project.completed || {}).filter(Boolean).length; }
 
 // ============================================================
@@ -1936,6 +1946,7 @@ function renderModule(id) {
       <button class="btn-export word" onclick="exportWord(${id})">📄 Word (.docx)</button>
       <button class="btn-export ppt" onclick="exportPPT(${id})">📊 PowerPoint (.pptx)</button>
       <button class="btn-export copy-btn" onclick="copyOutput(${id})" id="copy-btn-${id}">📋 Copy Text</button>
+      ${[1,2,4].includes(mod.id) ? '<button class="btn-export bop-deck" onclick="generateBOPDeck()" title="Synthesize all completed modules into an 8-slide BOP Intelligence Deck">🎯 BOP Intelligence Deck</button>' : ''}
     </div>
   </div>`;
 
@@ -3024,6 +3035,563 @@ function markComplete(moduleId) {
   renderModuleNav();
   const btn = document.querySelector('#output-card-' + moduleId + ' .btn-mark-complete');
   if (btn) btn.textContent = project.completed[moduleId] ? '✓ Complete' : 'Mark Complete';
+}
+
+
+// ============================================================
+// BOP INTELLIGENCE DECK — 8-SLIDE PPTX GENERATOR
+// ============================================================
+
+async function generateBOPDeck() {
+  var project = getProject(currentProjectId);
+  if (!project) { alert('No active project found.'); return; }
+
+  var completedModules = MODULES.filter(function(m) {
+    return project.outputs && project.outputs[m.id] && project.outputs[m.id].trim().length > 0;
+  });
+
+  if (completedModules.length === 0) {
+    alert('Please complete at least one module analysis before generating the BOP Intelligence Deck.');
+    return;
+  }
+
+  // Show loading state on button
+  var btn = document.querySelector('.btn-export.bop-deck');
+  var origText = btn ? btn.textContent : '';
+  if (btn) btn.textContent = '⏳ Synthesizing…';
+
+  try {
+    // Step 1: Build synthesis prompt from all completed module outputs
+    var moduleContext = completedModules.map(function(m) {
+      var output = project.outputs[m.id] || '';
+      return 'MODULE ' + m.number + ' — ' + m.name.toUpperCase() + ':\n' + output.substring(0, 2000);
+    }).join('\n\n---\n\n');
+
+    var synthesisPrompt = 'You are a senior strategic analyst for Emerald Expositions. ' +
+      'Based on the following BOP module intelligence for ' + project.name + ' (' + project.season + '), ' +
+      'synthesize concise, slide-ready content for exactly 8 BOP slides. ' +
+      'Each slide must use real, specific data and insights from the module outputs below — not generic content.\n\n' +
+      'SHOW: ' + project.name + '\n' +
+      'VERTICAL: ' + project.vertical + '\n' +
+      'SEASON: ' + project.season + '\n\n' +
+      'MODULE INTELLIGENCE:\n' + moduleContext + '\n\n' +
+      'OUTPUT FORMAT — Return ONLY valid JSON, no markdown, no backticks, no extra text:\n' +
+      '{' +
+        '"showName": "' + project.name + '",' +
+        '"season": "' + project.season + '",' +
+        '"slides": {' +
+          '"marketOverview": {' +
+            '"headline": "one sentence market summary",' +
+            '"segments": [{"name":"segment name","cagr":"X-Y%","profile":"growth profile","characteristic":"key insight"}, ...],' +
+            '"trends": ["trend 1","trend 2","trend 3","trend 4"],' +
+            '"opportunities": ["opportunity 1","opportunity 2","opportunity 3"],' +
+            '"topRegions": ["region 1","region 2","region 3","region 4","region 5"]' +
+          '},' +
+          '"stateOfIndustry": {' +
+            '"stats": [{"label":"stat label","value":"big number","sub":"context"}],' +
+            '"sections": [{"num":"01","title":"HEADLINE TRAJECTORY","body":"2-3 sentences"},{"num":"02","title":"SENTIMENT & LEADING INDICATORS","body":"2-3 sentences"},{"num":"03","title":"DOMINANT WILDCARD / DISRUPTION","body":"2-3 sentences"},{"num":"04","title":"DEMAND FUNDAMENTALS","body":"2-3 sentences"},{"num":"05","title":"FOR ' + project.name.toUpperCase() + ' SPECIFICALLY","body":"3-4 sentences"}]' +
+          '},' +
+          '"competitiveEvents": {' +
+            '"competitors": [{"name":"competitor","overlap":"category","geography":"city/region","attendance":"number","threat":"HIGH or MEDIUM or LOW"}]' +
+          '},' +
+          '"winLoss": {' +
+            '"wins": [{"title":"win title","tag":"SHORT TAG","body":"one sentence explanation"}],' +
+            '"losses": [{"title":"competitor or challenge","tag":"SHORT TAG","body":"one sentence explanation"}]' +
+          '},' +
+          '"marketingChannels": {' +
+            '"channels": [{"rank":1,"name":"channel name","bracket":"[descriptor]","pct":"XX-XX%","bullets":["bullet 1","bullet 2","bullet 3"]}]' +
+          '},' +
+          '"budgetDrains": {' +
+            '"drains": [{"rank":1,"name":"cost category","bracket":"[descriptor]","pct":"X-X%","unit":"of what","bullets":["bullet 1","bullet 2","bullet 3"]}],' +
+            '"callout": "one bold closing insight about why the show is mission-critical"' +
+          '},' +
+          '"sources": {' +
+            '"marketResearch": ["source 1","source 2","source 3"],' +
+            '"tradeAssociations": ["source 1","source 2","source 3"],' +
+            '"eventSources": ["source 1","source 2","source 3"]' +
+          '},' +
+          '"swot": {' +
+            '"strengths": [{"title":"strength title","body":"explanation"}],' +
+            '"weaknesses": [{"title":"weakness title","body":"explanation"}],' +
+            '"opportunities": [{"title":"opportunity title","body":"explanation"}],' +
+            '"threats": [{"title":"threat title","body":"explanation"}]' +
+          '}' +
+        '}' +
+      '}';
+
+    if (btn) btn.textContent = '⏳ Calling AI…';
+
+    // Step 2: Call Claude to synthesize
+    var response = await fetch('https://emerald-interrogator.cmerhy.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: synthesisPrompt }]
+      })
+    });
+
+    if (!response.ok) throw new Error('API call failed: ' + response.status);
+    var data = await response.json();
+    var rawText = data.content && data.content[0] ? data.content[0].text : '';
+
+    // Step 3: Parse JSON response
+    var cleanText = rawText.replace(/```json/g,'').replace(/```/g,'').trim();
+    var slideData = JSON.parse(cleanText);
+
+    if (btn) btn.textContent = '⏳ Building slides…';
+
+    // Step 4: Generate PPTX
+    await buildBOPDeckPPTX(slideData, project);
+
+  } catch(err) {
+    console.error('BOP Deck error:', err);
+    alert('Error generating BOP Intelligence Deck: ' + err.message + '\n\nPlease try again.');
+  } finally {
+    if (btn) btn.textContent = origText;
+  }
+}
+
+async function buildBOPDeckPPTX(data, project) {
+  // Load PptxGenJS if needed
+  if (!window.PptxGenJS && !window.pptxgen) {
+    await new Promise(function(resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  var PptxClass = window.PptxGenJS || window.pptxgen;
+  var pptx = new PptxClass();
+  pptx.layout = 'LAYOUT_16x9';
+  pptx.title = data.showName + ' BOP Intelligence Deck';
+
+  // Emerald brand colors
+  var DARK_TEAL  = '0D5C63';
+  var LIME_GREEN = '8DC63F';
+  var MID_TEAL   = '1A5C5A';
+  var WHITE      = 'FFFFFF';
+  var LIGHT_GRAY = 'F0F4F5';
+  var TEXT_DARK  = '1A1A1A';
+  var TEXT_GRAY  = '5F6673';
+  var TEAL_MID   = '154E4B';
+
+  var slides = data.slides;
+  var showName = data.showName;
+  var season = data.season;
+
+  // Helper: add Emerald geometric motif (large X/diamond shape approximated with shapes)
+  function addEmeraldMotif(slide, style) {
+    // style: 'title' = lime green, 'divider' = light gray
+    var col = style === 'title' ? LIME_GREEN : 'C8D0D2';
+    var thickness = 0.32;
+    // Vertical bar
+    slide.addShape(pptx.shapes.RECTANGLE, { x:1.2, y:0, w:thickness, h:7.5, fill:{color:col}, line:{color:col} });
+    // Diagonal top-left to center
+    slide.addShape(pptx.shapes.RECTANGLE, { x:0, y:0, w:2.8, h:thickness, fill:{color:col}, line:{color:col}, rotate:35 });
+    // Diagonal bottom-left to center
+    slide.addShape(pptx.shapes.RECTANGLE, { x:0, y:5.2, w:2.8, h:thickness, fill:{color:col}, line:{color:col}, rotate:-35 });
+    // Horizontal arrow bar
+    slide.addShape(pptx.shapes.RECTANGLE, { x:0, y:3.6, w:2.6, h:thickness, fill:{color:col}, line:{color:col} });
+    // Arrow head
+    slide.addShape(pptx.shapes.RECTANGLE, { x:2.2, y:3.1, w:thickness, h:1.2, fill:{color:col}, line:{color:col}, rotate:45 });
+  }
+
+  function addEmeraldLogo(slide) {
+    slide.addText('✦ EMERALD', {
+      x:8.5, y:0.18, w:1.3, h:0.35,
+      fontSize:9, bold:true, color:LIME_GREEN,
+      fontFace:'Calibri', align:'right'
+    });
+  }
+
+  function addTopStrip(slide) {
+    slide.addShape(pptx.shapes.RECTANGLE, {
+      x:0, y:0, w:10, h:0.08,
+      fill:{color:LIME_GREEN}, line:{color:LIME_GREEN}
+    });
+  }
+
+  function addSourceLine(slide, text) {
+    slide.addText(text || 'Source: Emerald Interrogator BOP Intelligence Platform · AI-synthesized from completed module outputs', {
+      x:0.3, y:7.1, w:9.4, h:0.25,
+      fontSize:7.5, italic:true, color:'888888',
+      fontFace:'Calibri', align:'left'
+    });
+  }
+
+  // ── SLIDE 1: TITLE ──────────────────────────────────────────
+  var s1 = pptx.addSlide();
+  s1.background = { color: DARK_TEAL };
+  addEmeraldMotif(s1, 'title');
+  s1.addText(showName.toUpperCase(), {
+    x:3.2, y:1.6, w:6.5, h:0.6,
+    fontSize:28, bold:true, color:WHITE,
+    fontFace:'Calibri', charSpacing:3, align:'left'
+  });
+  s1.addText('BRAND OPERATING PLAN', {
+    x:3.2, y:2.3, w:6.5, h:0.6,
+    fontSize:28, bold:true, color:WHITE,
+    fontFace:'Calibri', charSpacing:3, align:'left'
+  });
+  s1.addText(season, {
+    x:3.2, y:3.0, w:6.5, h:0.5,
+    fontSize:26, bold:true, color:WHITE,
+    fontFace:'Calibri', charSpacing:3, align:'left'
+  });
+  s1.addText('✦ EMERALD', {
+    x:7.2, y:6.6, w:2.5, h:0.4,
+    fontSize:14, bold:true, color:LIME_GREEN,
+    fontFace:'Calibri', align:'right'
+  });
+
+  // ── SLIDE 2: MARKET OVERVIEW ─────────────────────────────────
+  var s2 = pptx.addSlide();
+  s2.background = { color: WHITE };
+  addTopStrip(s2);
+  addEmeraldLogo(s2);
+
+  s2.addText('Market Overview', {
+    x:0.3, y:0.15, w:7, h:0.55,
+    fontSize:26, bold:true, color:DARK_TEAL,
+    fontFace:'Calibri'
+  });
+
+  // Segment table header
+  s2.addText('Segment-by-Segment Growth Analysis', {
+    x:0.3, y:0.85, w:5, h:0.28,
+    fontSize:11, bold:true, color:DARK_TEAL, fontFace:'Calibri'
+  });
+
+  var tableData = [['Segment','Est. CAGR','Growth Profile','Key Characteristic']];
+  var segs = slides.marketOverview.segments || [];
+  segs.forEach(function(seg) {
+    tableData.push([seg.name || '', seg.cagr || '', seg.profile || '', seg.characteristic || '']);
+  });
+
+  s2.addTable(tableData, {
+    x:0.3, y:1.15, w:6.0, h:Math.min(segs.length * 0.38 + 0.38, 3.8),
+    fontFace:'Calibri', fontSize:9,
+    rowH:0.35,
+    border:{type:'solid', color:'D5E8EA', pt:0.5},
+    fill:{color:WHITE},
+    color:TEXT_DARK,
+    align:'left',
+    valign:'middle',
+    colW:[1.4, 0.7, 1.0, 2.9],
+    firstRowFill:{color:MID_TEAL},
+    firstRowColor:WHITE,
+    firstRowFontSize:9,
+    firstRowBold:true
+  });
+
+  // Industry Trends
+  s2.addText('Industry Trends', {
+    x:6.5, y:0.85, w:3.2, h:0.28,
+    fontSize:11, bold:true, color:DARK_TEAL, fontFace:'Calibri'
+  });
+  var trendText = (slides.marketOverview.trends || []).map(function(t) {
+    return { text: t, options: { bullet: true, breakLine: true, fontSize: 9, color: TEXT_DARK, fontFace: 'Calibri' } };
+  });
+  s2.addText(trendText, { x:6.5, y:1.15, w:3.2, h:2.2, valign:'top' });
+
+  // Opportunities
+  s2.addText('Potential Opportunities', {
+    x:6.5, y:3.45, w:3.2, h:0.28,
+    fontSize:11, bold:true, color:DARK_TEAL, fontFace:'Calibri'
+  });
+  var oppText = (slides.marketOverview.opportunities || []).map(function(o) {
+    return { text: o, options: { bullet: true, breakLine: true, fontSize: 9, color: TEXT_DARK, fontFace: 'Calibri' } };
+  });
+  s2.addText(oppText, { x:6.5, y:3.75, w:3.2, h:1.8, valign:'top' });
+
+  // Key Regions
+  s2.addText('Key Regions', {
+    x:0.3, y:5.1, w:6.0, h:0.28,
+    fontSize:11, bold:true, color:DARK_TEAL, fontFace:'Calibri'
+  });
+  var regText = (slides.marketOverview.topRegions || []).map(function(r) {
+    return { text: r, options: { bullet: true, breakLine: true, fontSize: 9, color: TEXT_DARK, fontFace: 'Calibri' } };
+  });
+  s2.addText(regText, { x:0.3, y:5.4, w:6.0, h:1.2, valign:'top' });
+  addSourceLine(s2);
+
+  // ── SLIDE 3: STATE OF THE INDUSTRY ───────────────────────────
+  var s3 = pptx.addSlide();
+  s3.background = { color: WHITE };
+  addTopStrip(s3);
+  addEmeraldLogo(s3);
+
+  s3.addText('State of the ' + (project.vertical || 'Industry') + ' B2B Industry', {
+    x:0.3, y:0.15, w:9.2, h:0.55,
+    fontSize:22, bold:true, color:DARK_TEAL, fontFace:'Calibri'
+  });
+
+  // Left stat column
+  var stats = slides.stateOfIndustry.stats || [];
+  stats.slice(0,4).forEach(function(stat, i) {
+    var y = 0.85 + i * 1.3;
+    s3.addShape(pptx.shapes.RECTANGLE, { x:0.1, y:y, w:2.1, h:1.15, fill:{color:LIGHT_GRAY}, line:{color:'D5E8EA', pt:1} });
+    s3.addText(stat.value || '', { x:0.15, y:y+0.05, w:2.0, h:0.55, fontSize:26, bold:true, color:DARK_TEAL, fontFace:'Calibri', align:'center' });
+    s3.addText(stat.label || '', { x:0.15, y:y+0.58, w:2.0, h:0.25, fontSize:8, color:TEXT_GRAY, fontFace:'Calibri', align:'center' });
+    s3.addText(stat.sub || '', { x:0.15, y:y+0.82, w:2.0, h:0.25, fontSize:7.5, italic:true, color:LIME_GREEN, fontFace:'Calibri', align:'center' });
+  });
+
+  // Right content sections
+  var sections = slides.stateOfIndustry.sections || [];
+  var secPositions = [{x:2.35,y:0.82,w:3.7},{x:6.15,y:0.82,w:3.7},{x:6.15,y:2.75,w:3.7},{x:2.35,y:3.5,w:7.45},{x:2.35,y:5.2,w:7.45}];
+  sections.slice(0,5).forEach(function(sec, i) {
+    var pos = secPositions[i];
+    var h = i >= 3 ? 1.5 : 1.8;
+    s3.addShape(pptx.shapes.RECTANGLE, { x:pos.x, y:pos.y, w:pos.w, h:h, fill:{color:LIGHT_GRAY}, line:{color:'D5E8EA', pt:0.5} });
+    s3.addShape(pptx.shapes.RECTANGLE, { x:pos.x, y:pos.y, w:pos.w, h:0.28, fill:{color:MID_TEAL}, line:{color:MID_TEAL} });
+    s3.addText((sec.num || '') + '  ' + (sec.title || ''), { x:pos.x+0.08, y:pos.y+0.04, w:pos.w-0.16, h:0.22, fontSize:8, bold:true, color:WHITE, fontFace:'Calibri' });
+    s3.addText(sec.body || '', { x:pos.x+0.08, y:pos.y+0.32, w:pos.w-0.16, h:h-0.38, fontSize:8.5, color:TEXT_DARK, fontFace:'Calibri', valign:'top' });
+  });
+  addSourceLine(s3);
+
+  // ── SLIDE 4: COMPETITIVE EVENTS ───────────────────────────────
+  var s4 = pptx.addSlide();
+  s4.background = { color: WHITE };
+  addTopStrip(s4);
+  addEmeraldLogo(s4);
+
+  s4.addText('Competitive Events', {
+    x:0.3, y:0.15, w:7, h:0.55,
+    fontSize:26, bold:true, color:DARK_TEAL, fontFace:'Calibri'
+  });
+
+  var competitors = slides.competitiveEvents.competitors || [];
+  var half = Math.ceil(competitors.length / 2);
+  var leftComps = competitors.slice(0, half);
+  var rightComps = competitors.slice(half);
+
+  function renderCompTable(slide, comps, xOffset) {
+    var tableRows = [['Competitor','Key Overlap','Geography','Attendance','Threat']];
+    comps.forEach(function(c) {
+      tableRows.push([c.name||'', c.overlap||'', c.geography||'', c.attendance||'', c.threat||'']);
+    });
+    slide.addTable(tableRows, {
+      x:xOffset, y:0.85, w:4.6, h:Math.min(comps.length*0.55+0.45, 5.8),
+      fontFace:'Calibri', fontSize:9,
+      rowH:0.45,
+      border:{type:'solid', color:'D5E8EA', pt:0.5},
+      color:TEXT_DARK, align:'left', valign:'middle',
+      colW:[1.1, 1.0, 0.9, 0.8, 0.8],
+      firstRowFill:{color:MID_TEAL},
+      firstRowColor:WHITE, firstRowBold:true, firstRowFontSize:9
+    });
+  }
+
+  renderCompTable(s4, leftComps, 0.3);
+  renderCompTable(s4, rightComps, 5.1);
+
+  // Legend
+  s4.addShape(pptx.shapes.RECTANGLE, {x:8.3,y:6.1,w:0.4,h:0.2,fill:{color:'92D050'},line:{color:'92D050'}});
+  s4.addText('Low', {x:8.75,y:6.08,w:0.8,h:0.22,fontSize:8,color:TEXT_DARK,fontFace:'Calibri'});
+  s4.addShape(pptx.shapes.RECTANGLE, {x:8.3,y:6.38,w:0.4,h:0.2,fill:{color:'FFC000'},line:{color:'FFC000'}});
+  s4.addText('Medium', {x:8.75,y:6.36,w:0.8,h:0.22,fontSize:8,color:TEXT_DARK,fontFace:'Calibri'});
+  s4.addShape(pptx.shapes.RECTANGLE, {x:8.3,y:6.66,w:0.4,h:0.2,fill:{color:'FF0000'},line:{color:'FF0000'}});
+  s4.addText('High', {x:8.75,y:6.64,w:0.8,h:0.22,fontSize:8,color:TEXT_DARK,fontFace:'Calibri'});
+  addSourceLine(s4);
+
+  // ── SLIDE 5: WIN / LOSS ANALYSIS ─────────────────────────────
+  var s5 = pptx.addSlide();
+  s5.background = { color: WHITE };
+  addTopStrip(s5);
+  addEmeraldLogo(s5);
+
+  s5.addText('WIN / LOSS ANALYSIS', {
+    x:0.3, y:0.15, w:7, h:0.55,
+    fontSize:26, bold:true, color:DARK_TEAL, fontFace:'Calibri'
+  });
+
+  // Wins column
+  s5.addShape(pptx.shapes.RECTANGLE, {x:0.1,y:0.85,w:0.06,h:0.4,fill:{color:LIME_GREEN},line:{color:LIME_GREEN}});
+  s5.addText('Where ' + showName + ' WINS', {x:0.25,y:0.85,w:4.3,h:0.4,fontSize:16,bold:true,color:DARK_TEAL,fontFace:'Calibri'});
+
+  var wins = slides.winLoss.wins || [];
+  wins.slice(0,5).forEach(function(win, i) {
+    var y = 1.4 + i * 1.08;
+    s5.addShape(pptx.shapes.RECTANGLE, {x:0.1,y:y,w:0.05,h:0.9,fill:{color:LIME_GREEN},line:{color:LIME_GREEN}});
+    s5.addShape(pptx.shapes.RECTANGLE, {x:0.2,y:y,w:4.3,h:0.9,fill:{color:LIGHT_GRAY},line:{color:'D5E8EA',pt:0.5}});
+    s5.addText(win.title||'', {x:0.28,y:y+0.06,w:2.8,h:0.28,fontSize:11,bold:true,color:DARK_TEAL,fontFace:'Calibri'});
+    if (win.tag) {
+      s5.addShape(pptx.shapes.RECTANGLE, {x:3.12,y:y+0.08,w:1.3,h:0.24,fill:{color:LIME_GREEN},line:{color:LIME_GREEN}});
+      s5.addText(win.tag.toUpperCase(),{x:3.12,y:y+0.08,w:1.3,h:0.24,fontSize:7,bold:true,color:DARK_TEAL,fontFace:'Calibri',align:'center',valign:'middle'});
+    }
+    s5.addText(win.body||'',{x:0.28,y:y+0.38,w:4.15,h:0.46,fontSize:9,color:TEXT_GRAY,fontFace:'Calibri',valign:'top'});
+  });
+
+  // Losses column
+  s5.addShape(pptx.shapes.RECTANGLE, {x:4.8,y:0.85,w:0.06,h:0.4,fill:{color:'CC3333'},line:{color:'CC3333'}});
+  s5.addText('Where ' + showName + ' LOSES', {x:4.95,y:0.85,w:4.8,h:0.4,fontSize:16,bold:true,color:DARK_TEAL,fontFace:'Calibri'});
+
+  var losses = slides.winLoss.losses || [];
+  losses.slice(0,5).forEach(function(loss, i) {
+    var y = 1.4 + i * 1.08;
+    s5.addShape(pptx.shapes.RECTANGLE, {x:4.8,y:y,w:0.05,h:0.9,fill:{color:'CC3333'},line:{color:'CC3333'}});
+    s5.addShape(pptx.shapes.RECTANGLE, {x:4.9,y:y,w:4.8,h:0.9,fill:{color:LIGHT_GRAY},line:{color:'D5E8EA',pt:0.5}});
+    s5.addText(loss.title||'',{x:4.98,y:y+0.06,w:3.2,h:0.28,fontSize:11,bold:true,color:DARK_TEAL,fontFace:'Calibri'});
+    if (loss.tag) {
+      s5.addShape(pptx.shapes.RECTANGLE, {x:8.22,y:y+0.08,w:1.42,h:0.24,fill:{color:'FFCCCC'},line:{color:'FFAAAA'}});
+      s5.addText(loss.tag.toUpperCase(),{x:8.22,y:y+0.08,w:1.42,h:0.24,fontSize:7,bold:true,color:'CC0000',fontFace:'Calibri',align:'center',valign:'middle'});
+    }
+    s5.addText(loss.body||'',{x:4.98,y:y+0.38,w:4.65,h:0.46,fontSize:9,color:TEXT_GRAY,fontFace:'Calibri',valign:'top'});
+  });
+  addSourceLine(s5);
+
+  // ── SLIDE 6: MARKETING CHANNELS ──────────────────────────────
+  var s6 = pptx.addSlide();
+  s6.background = { color: WHITE };
+  addTopStrip(s6);
+  addEmeraldLogo(s6);
+
+  s6.addText(showName + ' Customer (Exhibitors) Marketing Channel Options', {
+    x:0.3, y:0.12, w:8.5, h:0.45,
+    fontSize:16, bold:true, color:DARK_TEAL, fontFace:'Calibri'
+  });
+  s6.addText('Demand Engine & Investment Priorities · Ranked by exhibitor spend share, highest to lowest', {
+    x:0.3, y:0.58, w:9.2, h:0.25,
+    fontSize:9.5, color:TEXT_GRAY, fontFace:'Calibri'
+  });
+
+  var channels = slides.marketingChannels.channels || [];
+  channels.slice(0,5).forEach(function(ch, i) {
+    var y = 0.9 + i * 1.25;
+    // Header bar
+    s6.addShape(pptx.shapes.RECTANGLE, {x:0.1,y:y,w:9.7,h:0.35,fill:{color:MID_TEAL},line:{color:MID_TEAL}});
+    s6.addText('Channel ' + ch.rank + '  ' + ch.name + '  ' + (ch.bracket||''), {
+      x:0.2,y:y+0.04,w:7.5,h:0.28,fontSize:10,bold:true,color:WHITE,fontFace:'Calibri'
+    });
+    s6.addText(ch.pct||'', {x:8.8,y:y+0.04,w:1.0,h:0.28,fontSize:11,bold:true,color:LIME_GREEN,fontFace:'Calibri',align:'right'});
+    // Bullets
+    var bText = (ch.bullets||[]).map(function(b) {
+      return {text:b, options:{bullet:true,breakLine:true,fontSize:8.5,color:TEXT_DARK,fontFace:'Calibri'}};
+    });
+    s6.addText(bText, {x:0.2,y:y+0.38,w:9.6,h:0.82,valign:'top'});
+  });
+  addSourceLine(s6, 'Source: ' + showName + ' exhibitor intelligence · industry benchmarks · Emerald Interrogator BOP Platform');
+
+  // ── SLIDE 7: BUDGET DRAINS ───────────────────────────────────
+  var s7 = pptx.addSlide();
+  s7.background = { color: WHITE };
+  addTopStrip(s7);
+  addEmeraldLogo(s7);
+
+  s7.addText(showName + ' Exhibitor Hidden Budget Drains — The Full Cost Stack', {
+    x:0.3, y:0.12, w:9.2, h:0.45,
+    fontSize:16, bold:true, color:DARK_TEAL, fontFace:'Calibri'
+  });
+  s7.addText('Cost categories that drain exhibitor budgets before marketing spend is even allocated.', {
+    x:0.3, y:0.58, w:9.2, h:0.22,
+    fontSize:9, color:TEXT_GRAY, fontFace:'Calibri'
+  });
+
+  var drains = slides.budgetDrains.drains || [];
+  var leftDrains = drains.slice(0, Math.ceil(drains.length/2));
+  var rightDrains = drains.slice(Math.ceil(drains.length/2));
+
+  function renderDrain(slide, drain, x, y, w) {
+    slide.addShape(pptx.shapes.RECTANGLE, {x:x,y:y,w:w,h:0.35,fill:{color:MID_TEAL},line:{color:MID_TEAL}});
+    slide.addText('Channel ' + drain.rank + '  ' + drain.name, {x:x+0.08,y:y+0.05,w:w-1.5,h:0.25,fontSize:9,bold:true,color:WHITE,fontFace:'Calibri'});
+    slide.addText((drain.pct||''), {x:x+w-1.4,y:y+0.05,w:0.8,h:0.25,fontSize:10,bold:true,color:LIME_GREEN,fontFace:'Calibri',align:'right'});
+    slide.addText((drain.unit||''), {x:x+w-0.6,y:y+0.07,w:0.55,h:0.22,fontSize:7.5,color:'AACCCC',fontFace:'Calibri',align:'right'});
+    if (drain.bracket) {
+      slide.addText(drain.bracket, {x:x+0.08,y:y+0.36,w:w-0.16,h:0.18,fontSize:7.5,italic:true,color:LIME_GREEN,fontFace:'Calibri'});
+    }
+    var bText = (drain.bullets||[]).map(function(b) {
+      return {text:b,options:{bullet:true,breakLine:true,fontSize:8,color:TEXT_DARK,fontFace:'Calibri'}};
+    });
+    slide.addText(bText, {x:x+0.08,y:y+(drain.bracket?0.56:0.4),w:w-0.16,h:1.2,valign:'top'});
+  }
+
+  leftDrains.forEach(function(d, i) {
+    renderDrain(s7, d, 0.1, 0.88 + i*1.9, 4.75);
+  });
+  rightDrains.forEach(function(d, i) {
+    renderDrain(s7, d, 5.05, 0.88 + i*1.9, 4.75);
+  });
+
+  // Callout box
+  if (slides.budgetDrains.callout) {
+    s7.addShape(pptx.shapes.RECTANGLE, {x:0.1,y:6.2,w:9.7,h:0.65,fill:{color:'FFF9E6'},line:{color:LIME_GREEN,pt:1}});
+    s7.addText('★  ' + slides.budgetDrains.callout, {
+      x:0.2,y:6.24,w:9.5,h:0.55,fontSize:9,bold:false,color:DARK_TEAL,fontFace:'Calibri',valign:'middle'
+    });
+  }
+  addSourceLine(s7, 'Source: ' + showName + ' exhibitor intelligence · Emerald Interrogator BOP Platform');
+
+  // ── SLIDE 8: SOURCES & METHODOLOGY ───────────────────────────
+  var s8 = pptx.addSlide();
+  s8.background = { color: WHITE };
+  addTopStrip(s8);
+  addEmeraldLogo(s8);
+
+  s8.addText(showName + ' Sources & Methodology', {
+    x:0.3, y:0.15, w:9.2, h:0.55,
+    fontSize:24, bold:true, color:DARK_TEAL, fontFace:'Calibri'
+  });
+  s8.addText('All data points sourced from AI synthesis of completed BOP modules, third-party industry research, trade association reporting, company filings, and primary event data.', {
+    x:0.3, y:0.75, w:9.2, h:0.32,
+    fontSize:9, color:TEXT_GRAY, fontFace:'Calibri'
+  });
+
+  var srcSections = [
+    {title:'MARKET RESEARCH & INDUSTRY REPORTS', items: slides.sources.marketResearch||[], x:0.3, w:3.0},
+    {title:'TRADE ASSOCIATIONS & GOVERNMENT BODIES', items: slides.sources.tradeAssociations||[], x:3.5, w:3.0},
+    {title:'PRIMARY EVENT & COMPANY SOURCES', items: slides.sources.eventSources||[], x:6.7, w:3.0},
+  ];
+  srcSections.forEach(function(sec) {
+    s8.addShape(pptx.shapes.RECTANGLE, {x:sec.x,y:1.15,w:sec.w,h:0.3,fill:{color:MID_TEAL},line:{color:MID_TEAL}});
+    s8.addText(sec.title, {x:sec.x+0.06,y:1.18,w:sec.w-0.12,h:0.24,fontSize:7.5,bold:true,color:WHITE,fontFace:'Calibri'});
+    var itemText = sec.items.map(function(item) {
+      return {text:item,options:{bullet:true,breakLine:true,fontSize:8,color:TEXT_DARK,fontFace:'Calibri'}};
+    });
+    s8.addText(itemText, {x:sec.x,y:1.5,w:sec.w,h:5.3,valign:'top'});
+  });
+  addSourceLine(s8, 'Methodology: All findings synthesized by Emerald Interrogator AI from completed BOP module outputs. Third-party data cross-referenced across minimum 3 independent sources.');
+
+  // ── SLIDE 9: SWOT ANALYSIS ────────────────────────────────────
+  var s9 = pptx.addSlide();
+  s9.background = { color: WHITE };
+  addTopStrip(s9);
+  addEmeraldLogo(s9);
+
+  s9.addText('SWOT Analysis', {
+    x:0.3, y:0.15, w:7, h:0.55,
+    fontSize:26, bold:true, color:DARK_TEAL, fontFace:'Calibri'
+  });
+
+  var swotQuads = [
+    {key:'strengths',   label:'Strengths',     items:slides.swot.strengths||[],    x:0.1, y:0.85, fill:MID_TEAL},
+    {key:'weaknesses',  label:'Weaknesses',    items:slides.swot.weaknesses||[],   x:5.1, y:0.85, fill:MID_TEAL},
+    {key:'opportunities',label:'Opportunities',items:slides.swot.opportunities||[],x:0.1, y:3.85, fill:TEAL_MID},
+    {key:'threats',     label:'Threats',       items:slides.swot.threats||[],      x:5.1, y:3.85, fill:TEAL_MID},
+  ];
+
+  swotQuads.forEach(function(q) {
+    var w = 4.75; var h = 2.85;
+    s9.addShape(pptx.shapes.RECTANGLE, {x:q.x,y:q.y,w:w,h:0.35,fill:{color:q.fill},line:{color:q.fill}});
+    s9.addText(q.label, {x:q.x+0.1,y:q.y+0.05,w:w-0.2,h:0.27,fontSize:13,bold:true,color:WHITE,fontFace:'Calibri'});
+    s9.addShape(pptx.shapes.RECTANGLE, {x:q.x,y:q.y+0.35,w:w,h:h-0.35,fill:{color:LIGHT_GRAY},line:{color:'D5E8EA',pt:0.5}});
+    var bulletText = q.items.map(function(item) {
+      return [
+        {text:(item.title||'') + ' ', options:{bold:true,fontSize:9.5,color:DARK_TEAL,fontFace:'Calibri'}},
+        {text:(item.body||''), options:{fontSize:9,color:TEXT_GRAY,fontFace:'Calibri',breakLine:true}},
+      ];
+    }).reduce(function(a,b){return a.concat(b);}, []);
+    s9.addText(bulletText, {x:q.x+0.1,y:q.y+0.42,w:w-0.2,h:h-0.5,valign:'top',bullet:false});
+  });
+
+  addSourceLine(s9, 'Source: ' + showName + ' BOP Intelligence · Emerald Interrogator AI Synthesis · ' + season);
+
+  // ── SAVE ─────────────────────────────────────────────────────
+  var fname = showName.replace(/[^a-z0-9]/gi,'_') + '_BOP_Intelligence_Deck_' + season.replace(/[^a-z0-9]/gi,'_') + '.pptx';
+  pptx.writeFile({ fileName: fname });
 }
 
 // ============================================================
