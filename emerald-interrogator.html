@@ -2246,6 +2246,8 @@ async function collectDocumentContext(moduleId) {
   }
 
   return contextParts.join('\n\n---\n\n');
+    // Cap total context to avoid token overflow
+    if (moduleContext.length > 8000) { moduleContext = moduleContext.substring(0, 8000) + '\n[...truncated for length]'; }
 }
 
 function updateProjectCompletion() {
@@ -3065,6 +3067,12 @@ async function generateBOPDeck() {
   if (btn) btn.textContent = '⏳ Synthesizing…';
 
   try {
+    // Sanitize values before embedding in JSON schema
+    var safeName   = (project.name   || '').replace(/\\/g,'').replace(/"/g,"'").replace(/\n/g,' ').replace(/\r/g,'');
+    var safeSeason = (project.season || '').replace(/\\/g,'').replace(/"/g,"'").replace(/\n/g,' ').replace(/\r/g,'');
+    var safeVertical = (project.vertical || '').replace(/\\/g,'').replace(/"/g,"'").replace(/\n/g,' ').replace(/\r/g,'');
+    var safeNameUpper = safeName.toUpperCase().substring(0, 20);
+
     // Step 1: Build synthesis prompt from all completed module outputs
     var moduleContext = completedModules.map(function(m) {
       var output = project.outputs[m.id] || '';
@@ -3079,46 +3087,52 @@ async function generateBOPDeck() {
       'VERTICAL: ' + project.vertical + '\n' +
       'SEASON: ' + project.season + '\n\n' +
       'MODULE INTELLIGENCE:\n' + moduleContext + '\n\n' +
-      'OUTPUT FORMAT — Return ONLY valid JSON, no markdown, no backticks, no extra text:\n' +
+      'CRITICAL: Return ONLY a raw JSON object. No markdown, no backticks, no explanation text before or after. Start your response with { and end with }.\n\n' +
+      'JSON STRUCTURE (be concise — max 2 sentences per body field, max 5 items per array):\n' +
       '{' +
-        '"showName": "' + project.name + '",' +
-        '"season": "' + project.season + '",' +
-        '"slides": {' +
-          '"marketOverview": {' +
-            '"headline": "one sentence market summary",' +
-            '"segments": [{"name":"segment name","cagr":"X-Y%","profile":"growth profile","characteristic":"key insight"}, ...],' +
-            '"trends": ["trend 1","trend 2","trend 3","trend 4"],' +
-            '"opportunities": ["opportunity 1","opportunity 2","opportunity 3"],' +
-            '"topRegions": ["region 1","region 2","region 3","region 4","region 5"]' +
+        '"showName":"' + safeName + '",' +
+        '"season":"' + safeSeason + '",' +
+        '"slides":{' +
+          '"marketOverview":{' +
+            '"segments":[{"name":"X","cagr":"X%","profile":"X","characteristic":"X"}],' +
+            '"trends":["trend1","trend2","trend3"],' +
+            '"opportunities":["opp1","opp2","opp3"],' +
+            '"topRegions":["region1","region2","region3"]' +
           '},' +
-          '"stateOfIndustry": {' +
-            '"stats": [{"label":"stat label","value":"big number","sub":"context"}],' +
-            '"sections": [{"num":"01","title":"HEADLINE TRAJECTORY","body":"2-3 sentences"},{"num":"02","title":"SENTIMENT & LEADING INDICATORS","body":"2-3 sentences"},{"num":"03","title":"DOMINANT WILDCARD / DISRUPTION","body":"2-3 sentences"},{"num":"04","title":"DEMAND FUNDAMENTALS","body":"2-3 sentences"},{"num":"05","title":"FOR ' + project.name.toUpperCase() + ' SPECIFICALLY","body":"3-4 sentences"}]' +
+          '"stateOfIndustry":{' +
+            '"stats":[{"label":"X","value":"X","sub":"X"}],' +
+            '"sections":[' +
+              '{"num":"01","title":"HEADLINE TRAJECTORY","body":"2 sentences max"},' +
+              '{"num":"02","title":"SENTIMENT & LEADING INDICATORS","body":"2 sentences max"},' +
+              '{"num":"03","title":"DOMINANT WILDCARD","body":"2 sentences max"},' +
+              '{"num":"04","title":"DEMAND FUNDAMENTALS","body":"2 sentences max"},' +
+              '{"num":"05","title":"FOR ' + safeNameUpper + ' SPECIFICALLY","body":"2 sentences max"}' +
+            ']' +
           '},' +
-          '"competitiveEvents": {' +
-            '"competitors": [{"name":"competitor","overlap":"category","geography":"city/region","attendance":"number","threat":"HIGH or MEDIUM or LOW"}]' +
+          '"competitiveEvents":{' +
+            '"competitors":[{"name":"X","overlap":"X","geography":"X","attendance":"X","threat":"HIGH"}]' +
           '},' +
-          '"winLoss": {' +
-            '"wins": [{"title":"win title","tag":"SHORT TAG","body":"one sentence explanation"}],' +
-            '"losses": [{"title":"competitor or challenge","tag":"SHORT TAG","body":"one sentence explanation"}]' +
+          '"winLoss":{' +
+            '"wins":[{"title":"X","tag":"TAG","body":"1 sentence"}],' +
+            '"losses":[{"title":"X","tag":"TAG","body":"1 sentence"}]' +
           '},' +
-          '"marketingChannels": {' +
-            '"channels": [{"rank":1,"name":"channel name","bracket":"[descriptor]","pct":"XX-XX%","bullets":["bullet 1","bullet 2","bullet 3"]}]' +
+          '"marketingChannels":{' +
+            '"channels":[{"rank":1,"name":"X","bracket":"[X]","pct":"X%","bullets":["b1","b2"]}]' +
           '},' +
-          '"budgetDrains": {' +
-            '"drains": [{"rank":1,"name":"cost category","bracket":"[descriptor]","pct":"X-X%","unit":"of what","bullets":["bullet 1","bullet 2","bullet 3"]}],' +
-            '"callout": "one bold closing insight about why the show is mission-critical"' +
+          '"budgetDrains":{' +
+            '"drains":[{"rank":1,"name":"X","bracket":"[X]","pct":"X%","unit":"of X","bullets":["b1","b2"]}],' +
+            '"callout":"1 sentence on why this show is mission-critical"' +
           '},' +
-          '"sources": {' +
-            '"marketResearch": ["source 1","source 2","source 3"],' +
-            '"tradeAssociations": ["source 1","source 2","source 3"],' +
-            '"eventSources": ["source 1","source 2","source 3"]' +
+          '"sources":{' +
+            '"marketResearch":["source1","source2"],' +
+            '"tradeAssociations":["source1","source2"],' +
+            '"eventSources":["source1","source2"]' +
           '},' +
-          '"swot": {' +
-            '"strengths": [{"title":"strength title","body":"explanation"}],' +
-            '"weaknesses": [{"title":"weakness title","body":"explanation"}],' +
-            '"opportunities": [{"title":"opportunity title","body":"explanation"}],' +
-            '"threats": [{"title":"threat title","body":"explanation"}]' +
+          '"swot":{' +
+            '"strengths":[{"title":"X","body":"1 sentence"}],' +
+            '"weaknesses":[{"title":"X","body":"1 sentence"}],' +
+            '"opportunities":[{"title":"X","body":"1 sentence"}],' +
+            '"threats":[{"title":"X","body":"1 sentence"}]' +
           '}' +
         '}' +
       '}';
@@ -3131,7 +3145,7 @@ async function generateBOPDeck() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 4000,
+        max_tokens: 6000,
         messages: [{ role: 'user', content: synthesisPrompt }]
       })
     });
@@ -3140,9 +3154,24 @@ async function generateBOPDeck() {
     var data = await response.json();
     var rawText = data.content && data.content[0] ? data.content[0].text : '';
 
-    // Step 3: Parse JSON response
+    // Step 3: Parse JSON response — extract just the JSON object
     var cleanText = rawText.replace(/```json/g,'').replace(/```/g,'').trim();
-    var slideData = JSON.parse(cleanText);
+    // Find the outermost JSON object boundaries
+    var jsonStart = cleanText.indexOf('{');
+    var jsonEnd = cleanText.lastIndexOf('}');
+    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+      throw new Error('No valid JSON object found in AI response. Response length: ' + rawText.length + ' chars');
+    }
+    cleanText = cleanText.substring(jsonStart, jsonEnd + 1);
+    var slideData;
+    try {
+      slideData = JSON.parse(cleanText);
+    } catch(parseErr) {
+      // Try to salvage truncated JSON by finding last complete object
+      console.error('JSON parse error:', parseErr.message);
+      console.error('Raw response length:', rawText.length);
+      throw new Error('AI response was cut off mid-JSON. This usually means the response was too long. Try completing more modules first so the AI has richer context, or contact support. Parse error: ' + parseErr.message);
+    }
 
     if (btn) btn.textContent = '⏳ Building slides…';
 
@@ -3184,8 +3213,8 @@ async function buildBOPDeckPPTX(data, project) {
   var TEAL_MID   = '154E4B';
 
   var slides = data.slides;
-  var showName = data.showName;
-  var season = data.season;
+  var showName = (data.showName || project.name || 'Show').replace(/"/g,"'");
+  var season = (data.season || project.season || '').replace(/"/g,"'");
 
   // Helper: add Emerald geometric motif (large X/diamond shape approximated with shapes)
   function addEmeraldMotif(slide, style) {
