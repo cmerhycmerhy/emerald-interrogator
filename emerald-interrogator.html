@@ -3195,23 +3195,44 @@ if (btn) btn.textContent = '⏳ Calling AI…';
     var data = await response.json();
     var rawText = data.content && data.content[0] ? data.content[0].text : '';
 
-    // Step 3: Parse JSON response — extract just the JSON object
+    // Step 3: Parse JSON response — extract just the JSON object using brace depth
     var cleanText = rawText.replace(/```json/g,'').replace(/```/g,'').trim();
-    // Find the outermost JSON object boundaries
-    var jsonStart = cleanText.indexOf('{');
-    var jsonEnd = cleanText.lastIndexOf('}');
-    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
-      throw new Error('No valid JSON object found in AI response. Response length: ' + rawText.length + ' chars');
+
+    // Find matching closing brace using depth counter (handles } inside string values)
+    function extractJSON(str) {
+      var start = str.indexOf('{');
+      if (start === -1) return null;
+      var depth = 0;
+      var inStr = false;
+      var escape = false;
+      for (var i = start; i < str.length; i++) {
+        var ch = str[i];
+        if (escape) { escape = false; continue; }
+        if (ch === '\\') { escape = true; continue; }
+        if (ch === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) return str.substring(start, i + 1);
+        }
+      }
+      return null;
     }
-    cleanText = cleanText.substring(jsonStart, jsonEnd + 1);
+
+    var jsonStr = extractJSON(cleanText);
+    if (!jsonStr) {
+      throw new Error('No valid JSON object found in AI response. Length: ' + rawText.length + ' chars. Please try again.');
+    }
+
     var slideData;
     try {
-      slideData = JSON.parse(cleanText);
+      slideData = JSON.parse(jsonStr);
     } catch(parseErr) {
-      // Try to salvage truncated JSON by finding last complete object
       console.error('JSON parse error:', parseErr.message);
-      console.error('Raw response length:', rawText.length);
-      throw new Error('AI response was cut off mid-JSON. This usually means the response was too long. Try completing more modules first so the AI has richer context, or contact support. Parse error: ' + parseErr.message);
+      console.error('JSON string length:', jsonStr.length);
+      console.error('First 500 chars:', jsonStr.substring(0, 500));
+      throw new Error('Could not parse AI response as JSON. Parse error: ' + parseErr.message + '. Please try again.');
     }
 
     if (btn) btn.textContent = '⏳ Building slides…';
