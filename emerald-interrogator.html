@@ -3107,65 +3107,78 @@ async function generateBOPDeck() {
       return 'MODULE ' + m.number + ' — ' + m.name.toUpperCase() + ':\n' + output.substring(0, 2000);
     }).join('\n\n---\n\n');
 
-    var synthesisPrompt = 'You are a senior strategic analyst for Emerald Expositions. ' +
-      'Based on the following BOP module intelligence for ' + project.name + ' (' + project.season + '), ' +
-      'synthesize concise, slide-ready content for exactly 8 BOP slides. ' +
-      'Each slide must use real, specific data and insights from the module outputs below — not generic content.\n\n' +
-      'SHOW: ' + project.name + '\n' +
-      'VERTICAL: ' + project.vertical + '\n' +
-      'SEASON: ' + project.season + '\n\n' +
+    var synthesisPrompt = 'You are a strategic analyst for Emerald Expositions. ' +
+      'Based on the BOP module intelligence below for ' + safeName + ' (' + safeSeason + '), ' +
+      'generate slide content for an 8-slide BOP deck. Be extremely concise.\n\n' +
+      'SHOW: ' + safeName + '\nVERTICAL: ' + safeVertical + '\nSEASON: ' + safeSeason + '\n\n' +
       'MODULE INTELLIGENCE:\n' + moduleContext + '\n\n' +
-      'CRITICAL: Return ONLY a raw JSON object. No markdown, no backticks, no explanation text before or after. Start your response with { and end with }.\n\n' +
-      'JSON STRUCTURE (be concise — max 2 sentences per body field, max 5 items per array):\n' +
+      'RULES: Return ONLY raw JSON. No markdown. No backticks. Start with { end with }. ' +
+      'Max 4 items per array. Max 1 sentence per text field. Be specific to this show.\n\n' +
+      'JSON:\n' +
       '{' +
         '"showName":"' + safeName + '",' +
         '"season":"' + safeSeason + '",' +
         '"slides":{' +
           '"marketOverview":{' +
             '"segments":[{"name":"X","cagr":"X%","profile":"X","characteristic":"X"}],' +
-            '"trends":["trend1","trend2","trend3"],' +
-            '"opportunities":["opp1","opp2","opp3"],' +
-            '"topRegions":["region1","region2","region3"]' +
+            '"trends":["t1","t2","t3"],' +
+            '"opportunities":["o1","o2","o3"],' +
+            '"topRegions":["r1","r2","r3"]' +
           '},' +
           '"stateOfIndustry":{' +
-            '"stats":[{"label":"X","value":"X","sub":"X"}],' +
+            '"stats":[{"label":"X","value":"X","sub":"X"},{"label":"X","value":"X","sub":"X"},{"label":"X","value":"X","sub":"X"}],' +
             '"sections":[' +
-              '{"num":"01","title":"HEADLINE TRAJECTORY","body":"2 sentences max"},' +
-              '{"num":"02","title":"SENTIMENT & LEADING INDICATORS","body":"2 sentences max"},' +
-              '{"num":"03","title":"DOMINANT WILDCARD","body":"2 sentences max"},' +
-              '{"num":"04","title":"DEMAND FUNDAMENTALS","body":"2 sentences max"},' +
-              '{"num":"05","title":"FOR ' + safeNameUpper + ' SPECIFICALLY","body":"2 sentences max"}' +
+              '{"num":"01","title":"HEADLINE TRAJECTORY","body":"One sentence."},' +
+              '{"num":"02","title":"SENTIMENT AND LEADING INDICATORS","body":"One sentence."},' +
+              '{"num":"03","title":"DOMINANT WILDCARD","body":"One sentence."},' +
+              '{"num":"04","title":"DEMAND FUNDAMENTALS","body":"One sentence."},' +
+              '{"num":"05","title":"FOR THIS SHOW SPECIFICALLY","body":"One sentence."}' +
             ']' +
           '},' +
           '"competitiveEvents":{' +
-            '"competitors":[{"name":"X","overlap":"X","geography":"X","attendance":"X","threat":"HIGH"}]' +
+            '"competitors":[' +
+              '{"name":"X","overlap":"X","geography":"X","attendance":"X","threat":"HIGH"},' +
+              '{"name":"X","overlap":"X","geography":"X","attendance":"X","threat":"MEDIUM"},' +
+              '{"name":"X","overlap":"X","geography":"X","attendance":"X","threat":"MEDIUM"},' +
+              '{"name":"X","overlap":"X","geography":"X","attendance":"X","threat":"LOW"}' +
+            ']' +
           '},' +
           '"winLoss":{' +
-            '"wins":[{"title":"X","tag":"TAG","body":"1 sentence"}],' +
-            '"losses":[{"title":"X","tag":"TAG","body":"1 sentence"}]' +
+            '"wins":[{"title":"X","tag":"TAG","body":"One sentence."},{"title":"X","tag":"TAG","body":"One sentence."},{"title":"X","tag":"TAG","body":"One sentence."}],' +
+            '"losses":[{"title":"X","tag":"TAG","body":"One sentence."},{"title":"X","tag":"TAG","body":"One sentence."},{"title":"X","tag":"TAG","body":"One sentence."}]' +
           '},' +
           '"marketingChannels":{' +
-            '"channels":[{"rank":1,"name":"X","bracket":"[X]","pct":"X%","bullets":["b1","b2"]}]' +
+            '"channels":[' +
+              '{"rank":1,"name":"X","bracket":"[X]","pct":"XX-XX%","bullets":["b1","b2"]},' +
+              '{"rank":2,"name":"X","bracket":"[X]","pct":"XX-XX%","bullets":["b1","b2"]},' +
+              '{"rank":3,"name":"X","bracket":"[X]","pct":"XX-XX%","bullets":["b1","b2"]},' +
+              '{"rank":4,"name":"X","bracket":"[X]","pct":"XX-XX%","bullets":["b1","b2"]}' +
+            ']' +
           '},' +
           '"budgetDrains":{' +
-            '"drains":[{"rank":1,"name":"X","bracket":"[X]","pct":"X%","unit":"of X","bullets":["b1","b2"]}],' +
-            '"callout":"1 sentence on why this show is mission-critical"' +
+            '"drains":[' +
+              '{"rank":1,"name":"X","bracket":"[X]","pct":"X-X%","unit":"of X","bullets":["b1","b2"]},' +
+              '{"rank":2,"name":"X","bracket":"[X]","pct":"X-X%","unit":"of X","bullets":["b1","b2"]},' +
+              '{"rank":3,"name":"X","bracket":"[X]","pct":"X-X%","unit":"of X","bullets":["b1","b2"]},' +
+              '{"rank":4,"name":"X","bracket":"[X]","pct":"X-X%","unit":"of X","bullets":["b1","b2"]}' +
+            '],' +
+            '"callout":"One sentence on show mission-critical value."' +
           '},' +
           '"sources":{' +
-            '"marketResearch":["source1","source2"],' +
-            '"tradeAssociations":["source1","source2"],' +
-            '"eventSources":["source1","source2"]' +
+            '"marketResearch":["s1","s2","s3"],' +
+            '"tradeAssociations":["s1","s2","s3"],' +
+            '"eventSources":["s1","s2","s3"]' +
           '},' +
           '"swot":{' +
-            '"strengths":[{"title":"X","body":"1 sentence"}],' +
-            '"weaknesses":[{"title":"X","body":"1 sentence"}],' +
-            '"opportunities":[{"title":"X","body":"1 sentence"}],' +
-            '"threats":[{"title":"X","body":"1 sentence"}]' +
+            '"strengths":[{"title":"X","body":"One sentence."},{"title":"X","body":"One sentence."},{"title":"X","body":"One sentence."}],' +
+            '"weaknesses":[{"title":"X","body":"One sentence."},{"title":"X","body":"One sentence."},{"title":"X","body":"One sentence."}],' +
+            '"opportunities":[{"title":"X","body":"One sentence."},{"title":"X","body":"One sentence."},{"title":"X","body":"One sentence."}],' +
+            '"threats":[{"title":"X","body":"One sentence."},{"title":"X","body":"One sentence."},{"title":"X","body":"One sentence."}]' +
           '}' +
         '}' +
       '}';
 
-    if (btn) btn.textContent = '⏳ Calling AI…';
+if (btn) btn.textContent = '⏳ Calling AI…';
 
     // Step 2: Call Claude to synthesize
     var response = await fetch('https://emerald-interrogator.cmerhy.workers.dev', {
@@ -3173,7 +3186,7 @@ async function generateBOPDeck() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 6000,
+        max_tokens: 8000,
         messages: [{ role: 'user', content: synthesisPrompt }]
       })
     });
